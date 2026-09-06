@@ -1,0 +1,108 @@
+{
+  "version": "0.1.0-draft",
+  "_status": "DRAFT. Closes the code-side blocker on OI-005. Every item carries reviewStatus 'needs_review' and MUST be reviewed under DEP-003 before baseline. The scoring thresholds in particular are a reasoned starting point, not a validated instrument.",
+  "_source": "Adapted from the sebum-production axis of the Baumann Skin Type framework (REF-004, CC BY). The full Baumann instrument resolves 16 types across four axes; this uses only the dry/oily axis, because SRS 4.2 defines exactly four SkinType values and the other three axes have no consumer in this system.",
+  "_designNotes": [
+    "Questions ask about OBSERVED BEHAVIOUR over time, never about appearance in a photograph. FR-ONB-006's rationale is that skin type reflects sebum production across days, while an image captures one moment confounded by lighting and recent cleansing.",
+    "Scoring lives here rather than in Python so that CON-003 holds: no clinical judgement is encoded in application code. Changing a weight is a content change, reviewable by a practitioner who does not read Python.",
+    "The T-zone axis is separate from the oil axis on purpose. COMBINATION is not 'a bit oily' -- it is oily in one region and not another, and a single summed score cannot express that."
+  ],
+
+  "scoring": {
+    "_comment": "Evaluated in order. First matching rule wins. The order is the tie-break policy and is deliberate: COMBINATION is tested first because a combination profile also produces a moderate oil score and would otherwise be absorbed into OILY.",
+    "rules": [
+      {
+        "ruleId": "ST-COMB-1",
+        "result": "COMBINATION",
+        "conditions": { "tzone_min": 3, "cheek_dry_min": 2 },
+        "rationale": "Oil concentrated in the T-zone with dryness elsewhere. Both signals must be present; T-zone shine alone is not combination skin.",
+        "reviewStatus": "needs_review"
+      },
+      {
+        "ruleId": "ST-OILY-1",
+        "result": "OILY",
+        "conditions": { "oil_minus_dry_min": 3 },
+        "rationale": "Oil signal clearly dominates. The margin of 3 rather than 1 keeps a near-tie out of a definite classification.",
+        "reviewStatus": "needs_review"
+      },
+      {
+        "ruleId": "ST-DRY-1",
+        "result": "DRY",
+        "conditions": { "dry_minus_oil_min": 3 },
+        "rationale": "Dryness signal clearly dominates.",
+        "reviewStatus": "needs_review"
+      },
+      {
+        "ruleId": "ST-NORM-1",
+        "result": "NORMAL",
+        "conditions": {},
+        "rationale": "Fallback. Neither signal dominates and no regional split. NORMAL is the residual category, not a positive finding -- an unconditional final rule is what guarantees the scorer is total, so no answer set can leave a user without a type.",
+        "reviewStatus": "needs_review"
+      }
+    ]
+  },
+
+  "questions": [
+    {
+      "id": "Q1",
+      "prompt": "A few hours after washing your face, how does it usually feel?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q1A", "label": "Tight or rough", "scores": { "dry": 3 } },
+        { "id": "Q1B", "label": "Comfortable", "scores": {} },
+        { "id": "Q1C", "label": "Shiny in places", "scores": { "oil": 2, "tzone": 2 } },
+        { "id": "Q1D", "label": "Shiny all over", "scores": { "oil": 3 } }
+      ]
+    },
+    {
+      "id": "Q2",
+      "prompt": "By the middle of the day, where does your skin look shiny?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q2A", "label": "Nowhere", "scores": { "dry": 1 } },
+        { "id": "Q2B", "label": "Forehead, nose and chin only", "scores": { "oil": 2, "tzone": 3 } },
+        { "id": "Q2C", "label": "Most of my face", "scores": { "oil": 3 } }
+      ]
+    },
+    {
+      "id": "Q3",
+      "prompt": "How often do you notice flaking or rough patches on your cheeks?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q3A", "label": "Almost never", "scores": {} },
+        { "id": "Q3B", "label": "Now and then", "scores": { "dry": 2, "cheek_dry": 2 } },
+        { "id": "Q3C", "label": "Most days", "scores": { "dry": 3, "cheek_dry": 3 } }
+      ]
+    },
+    {
+      "id": "Q4",
+      "prompt": "Where can you see your pores most clearly?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q4A", "label": "I can't really see them", "scores": { "dry": 1 } },
+        { "id": "Q4B", "label": "Around my nose and forehead", "scores": { "oil": 1, "tzone": 2 } },
+        { "id": "Q4C", "label": "Across most of my face", "scores": { "oil": 2 } }
+      ]
+    },
+    {
+      "id": "Q5",
+      "prompt": "In cold or dry weather, what happens to your skin?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q5A", "label": "It gets noticeably drier or flaky", "scores": { "dry": 3, "cheek_dry": 2 } },
+        { "id": "Q5B", "label": "Not much changes", "scores": {} },
+        { "id": "Q5C", "label": "It still feels oily", "scores": { "oil": 2 } }
+      ]
+    },
+    {
+      "id": "Q6",
+      "prompt": "How often do you feel the need to blot or wash your face because of oil?",
+      "reviewStatus": "needs_review",
+      "options": [
+        { "id": "Q6A", "label": "Never", "scores": { "dry": 2 } },
+        { "id": "Q6B", "label": "Occasionally", "scores": { "oil": 1 } },
+        { "id": "Q6C", "label": "Most days", "scores": { "oil": 3 } }
+      ]
+    }
+  ]
+}
