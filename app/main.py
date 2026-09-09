@@ -4,6 +4,7 @@ Application entry point.
 """
 
 from __future__ import annotations
+from fastapi.middleware.cors import CORSMiddleware
 
 import logging
 from contextlib import asynccontextmanager
@@ -53,6 +54,18 @@ app = FastAPI(
 # traceback even if a handler forgets to catch something.
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(Exception, unhandled_error_handler)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:19006",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(api_router)
 

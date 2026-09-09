@@ -2,13 +2,13 @@
 Onboarding endpoints. FR-ONB-001 through FR-ONB-007.
 
 Every route here is POST, and none is PATCH or PUT. That is not a REST style
-preference -- FR-ONB-002's rationale states that an editable date of birth makes
+preference — FR-ONB-002's rationale states that an editable date of birth makes
 the FR-ONB-003 age gate trivially bypassable, so there is simply no route that
 can change one. The model raises if you try; the API gives you nothing to try
 with. FR-ONB-006 gets the same treatment: "completed once during onboarding" is
 read strictly.
 
-The one exception is safety answers, which are updatable by decision -- a user
+The one exception is safety answers, which are updatable by decision — a user
 whose wound has healed should not be locked out permanently. Every change is
 written to `SafetyAnswerChange` first, because `referral_flag` is what
 FR-TRI-001 checks before an image is ever captured, and a change to it with no
@@ -21,6 +21,7 @@ import logging
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, SessionDep, SettingsDep, TokenDep
 from app.core.errors import (
@@ -73,10 +74,10 @@ async def create_session(
     """
     Sign in, creating the account on first arrival.
 
-    Idempotent by construction. `auth_id` is the primary key and holds the
-    provider's subject claim, so a returning user of the same provider account
-    resolves to the existing row -- FR-ONB-001's acceptance criterion is
-    satisfied by the schema rather than by a check that could be forgotten.
+    Idempotent, including under concurrency. `auth_id` is the primary key and
+    holds the provider's subject claim, so FR-ONB-001's duplicate criterion is
+    enforced by the schema rather than by a check that could be forgotten — and
+    the insert below is written to survive losing the race to that constraint.
 
     No password is read, stored, or verified anywhere on this path. Supabase
     performed the sign-in; this endpoint only trusts a signature.
@@ -85,17 +86,37 @@ async def create_session(
     is_new = user is None
 
     if user is None:
-        user = User(
-            auth_id=claims.subject,
-            auth_provider=claims.provider,
-            # Placeholder until the date-of-birth screen. The column is NOT NULL
-            # because a confirmed user always has one, and `dob_confirmed_at` --
-            # not this field -- is what marks the step complete.
-            date_of_birth=date(1900, 1, 1),
-            scans_remaining=settings.default_scan_allowance,
-        )
-        session.add(user)
-        logger.info("created account for provider=%s", claims.provider)
+        # Two sign-in requests routinely arrive together: the client fires one
+        # on mount and another when the auth state settles, and two devices do
+        # the same. Both would see no row and both would insert.
+        #
+        # The savepoint makes the loser recoverable. A unique violation rolls
+        # back only this insert rather than poisoning the whole transaction, so
+        # the winner's row can then simply be read. Check-then-insert without
+        # it is a race however carefully it is written, because the gap between
+        # the two statements is exactly where the other request lands.
+        try:
+            async with session.begin_nested():
+                user = User(
+                    auth_id=claims.subject,
+                    auth_provider=claims.provider,
+                    # Placeholder until the date-of-birth screen. The column is
+                    # NOT NULL because a confirmed user always has one, and
+                    # `dob_confirmed_at` — not this field — marks the step done.
+                    date_of_birth=date(1900, 1, 1),
+                    scans_remaining=settings.default_scan_allowance,
+                )
+                session.add(user)
+                await session.flush()
+            logger.info("created account for provider=%s", claims.provider)
+        except IntegrityError:
+            user = await session.get(User, claims.subject)
+            if user is None:
+                # Not the constraint we expected. Let it surface rather than
+                # swallowing a real integrity problem.
+                raise
+            is_new = False
+            logger.info("concurrent sign-in resolved to the existing account")
 
     user.last_sign_in_at = datetime.now(timezone.utc)
     await session.flush()
@@ -122,15 +143,15 @@ async def set_date_of_birth(
     """
     Confirm the date of birth. Once. There is no route to change it afterwards.
 
-    Read the under-13 branch carefully, because it is the whole point of
+    Read the under-age branch carefully, because it is the whole point of
     FR-ONB-003 and it is easy to "fix" into a bug:
 
       * The request SUCCEEDS. Status 200, not 403.
       * The account is created and kept.
       * `scanAccessBlocked` comes back true, with no age and no reason.
 
-    Rejecting the date instead would tell the user what the threshold is and
-    hand them a second attempt at clearing it. FR-ONB-003 requires the minimum
+    Rejecting the date instead would state the threshold by implication and hand
+    the user a second attempt at clearing it. FR-ONB-003 requires the minimum
     age never to be stated, and this is where that is either honoured or quietly
     thrown away.
     """
@@ -146,7 +167,7 @@ async def set_date_of_birth(
         user.confirm_date_of_birth(payload.date_of_birth, date.today())
     except ValueError as exc:
         # Reached only for a future date or an age above the upper bound.
-        # Never for under-13 -- that path sets the flag and returns normally.
+        # Never for an under-age date — that path sets the flag and returns 200.
         raise InvalidDateOfBirth(detail={"reason": str(exc)}) from exc
 
     await session.flush()
@@ -338,7 +359,7 @@ async def delete_account(user: CurrentUser, session: SessionDep) -> None:
 
     Scan logs, routines, and safety answer audit rows go with it via
     `ondelete="CASCADE"`. Nothing is retained and nothing is anonymised and
-    kept -- "delete" means the row is gone.
+    kept — "delete" means the row is gone.
     """
     await session.delete(user)
     logger.info("account deleted")

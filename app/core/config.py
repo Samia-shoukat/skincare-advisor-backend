@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # --- Database (IF-SW-002, Supabase managed Postgres) -------------------
     # Empty by default so the app starts without a database. /readyz reports it.
     database_url: str = ""
+    supabase_url: str = ""
 
     # --- Auth (IF-SW-001, IF-COMM-002) -------------------------------------
     # Supabase signs access tokens with the project JWT secret. This backend
