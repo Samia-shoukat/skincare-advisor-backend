@@ -242,19 +242,17 @@ class AnalysisBackend(str, Enum):
     HOSTED_PROVIDER = "HOSTED_PROVIDER"
 
 
-class AnalysisTask(str, Enum):
+class ScanIneligibilityReason(str, Enum):
     """
-    The routable units of analysis. Appendix I assigns each to a backend, and
-    that assignment is server-side configuration rather than an architectural
-    choice (CON-004).
+    Why the capture control is unavailable.
 
-    At baseline every task sits on the hosted provider: no model has a recorded
-    evaluation yet, and FR-AI-010 refuses to activate one without it.
+    The client maps these to copy from the string resource; the reasons
+    themselves carry no user-facing text (IF-UI-001).
 
-    This enum is a design decision, not an SRS list -- the SRS names the tasks
-    in Appendix I prose. Adjust if the task split changes.
+    Order matters where more than one applies — see `evaluate_eligibility`.
     """
 
-    COSMETIC_CONCERNS = "COSMETIC_CONCERNS"
-    ACNE_DETECTION = "ACNE_DETECTION"
-    CLINICAL_SIGNAL_SCREENING = "CLINICAL_SIGNAL_SCREENING"
+    ONBOARDING_INCOMPLETE = "ONBOARDING_INCOMPLETE"
+    SCAN_ACCESS_BLOCKED = "SCAN_ACCESS_BLOCKED"
+    REFERRAL_REQUIRED = "REFERRAL_REQUIRED"
+    QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"

@@ -1,73 +1,72 @@
-# Skincare Advisor — Backend
-
-Backend service for an AI-assisted cosmetic skincare advisor, implemented
-against **SRS-AISA-001 v1.3**.
-
-The application photographs a user's face, identifies cosmetic concerns, and
-returns an over-the-counter product routine. Where it sees something outside
-what cosmetics can address, it stops and refers the user to a healthcare
-professional instead.
-
-**This is not a medical device and does not diagnose.** That constraint shapes
-almost every design decision in this repository — see [Safety
-constraints](#safety-constraints) before changing anything.
 
 ---
 
-## Contents
+## `README.md` — poori replace karein
 
-- [Status](#status)
-- [Quick start](#quick-start)
-- [Safety constraints](#safety-constraints)
-- [Architecture](#architecture)
-- [Project layout](#project-layout)
-- [Testing](#testing)
-- [Database migrations](#database-migrations)
-- [Known gaps](#known-gaps)
+```markdown
+# Skincare Advisor
 
----
+A skincare app that looks at a photo of your face, works out what it can help
+with, and builds a routine from over-the-counter products.
 
-## Status
+The part that matters more: when it sees something cosmetics can't help — a
+wound, a mole that's changed, signs of a skin condition — it stops, says what it
+saw, and tells you to see a doctor. It does not guess at a diagnosis.
 
-| Feature | Requirements | Backend | UI |
-| --- | --- | --- | --- |
-| 1. Onboarding | FR-ONB-001 … 008 | Complete, 43 tests passing | Not started |
-| 2. Capture | FR-CAM-001 … 004 | Not started | Not started |
-| 3. Triage & referral | FR-TRI-001 … 005 | Not started | Not started |
-| 4. AI analysis | FR-AI-001 … 010 | Schema defined | — |
-| 5. Recommendations | FR-REC-001 … 007 | Blocked (OI-002) | — |
-| 6. Subscription & quota | FR-SUB-001 … 005 | Not started | — |
-
-Feature 1 is verified at the API level. Several of its acceptance criteria are
-**Demonstration** items in SRS Section 7 and can only be verified on the UI —
-for example, that the date-of-birth screen does not state the minimum age. Those
-remain open.
+Built against a written specification (`SRS-AISA-001 v1.3`). Requirement-level
+traceability lives in `docs/features/`; this file is about running and
+understanding the thing.
 
 ---
 
-## Quick start
+## What works today
 
-Requires Python 3.13 and a Supabase project.
+**Onboarding is finished and running.** A user can sign in with Google or with
+an email and password, give their date of birth, answer four safety questions,
+take a short questionnaire that determines their skin type, and read what the
+app can and cannot do before agreeing to use it. All of that is live against a
+real database, tested three ways, and walked through end to end in the UI.
+
+**Nothing else is built yet.** The camera, the analysis, the routine engine and
+the scan quota are all still to come. Two of them are blocked on clinical
+content that hasn't been written — see [What's missing](#whats-missing).
+
+| Feature | State |
+| --- | --- |
+| Onboarding | Done — backend and UI |
+| Camera capture | Not started |
+| Referral and triage | Not started |
+| Image analysis | Response format defined, nothing wired up |
+| Routine recommendations | Blocked — the ingredient rules don't exist yet |
+| Scan quota | Not started |
+
+---
+
+## Running it
+
+Two repositories. The backend is Python, the app is React Native.
+
+### Backend
+
+Needs Python 3.13 and a Supabase project.
 
 ```bash
+cd skincare-advisor-backend
 python -m venv venv
 venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
-Create `.env` in the repository root:
+Create `.env` in that folder:
 
 ```ini
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 
-# Supabase → Settings → Database → Connection string (URI)
 DATABASE_URL=postgresql://postgres:PASSWORD@HOST:PORT/postgres
-
-# Supabase → Settings → API → JWT Settings → JWT Secret
+SUPABASE_URL=https://yourproject.supabase.co
 JWT_SECRET=your-project-jwt-secret
 
-# Feature 3 onwards
 GEMINI_API_KEY=
 PROVIDER_RETENTION_DISABLED=false
 
@@ -76,148 +75,180 @@ DEFAULT_SCAN_ALLOWANCE=1
 CONSENT_STATEMENT_VERSION=1.2
 ```
 
-`.env` is gitignored and must stay that way — it holds the database password.
-
-Apply migrations and start the server:
+All four Supabase values come from the dashboard: the connection string from
+Database settings, the rest from API settings. `.env` is gitignored and must
+stay that way.
 
 ```bash
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0
 ```
 
-Interactive API docs: <http://127.0.0.1:8000/docs>
-Readiness, with a per-requirement breakdown: <http://127.0.0.1:8000/readyz>
+`--host 0.0.0.0` matters for anything except a browser on the same machine —
+an emulator or a phone can't reach a server listening only on localhost.
 
-### Exercising the API before OAuth is wired up
+API docs: <http://127.0.0.1:8000/docs>
+Health, with a breakdown of what's configured: <http://127.0.0.1:8000/readyz>
 
-The backend only *verifies* Supabase-issued tokens; it never issues one. Anything
-holding the project secret can therefore mint a token it will accept, which is
-useful during development:
+### App
 
 ```bash
-python scripts/make_test_token.py
-python scripts/make_test_token.py --subject second-user
+cd skincare-advisor-frontend
+npm install
+npx expo start
 ```
 
-Paste the result into the **Authorize** box in `/docs`. Development only.
+Press `w` for a browser, `a` for an Android emulator. Its `.env` needs three
+values:
+
+```ini
+EXPO_PUBLIC_SUPABASE_URL=https://yourproject.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+That last one changes depending on where you're running it, and getting it
+wrong is by far the most common cause of "can't reach your profile":
+
+| Running on | API URL |
+| --- | --- |
+| Browser | `http://127.0.0.1:8000` |
+| Android emulator | `http://10.0.2.2:8000` |
+| Physical phone | your machine's LAN address, e.g. `http://192.168.1.5:8000` |
+
+`.env` is only read when Expo starts. Change it and you have to restart, not
+reload.
+
+### Testing without waiting for emails
+
+Supabase's free tier sends two or three emails an hour, which is not enough to
+test a sign-up flow. The backend only *checks* tokens — it never issues one — so
+anything holding the project secret can produce a token it will accept:
+
+```bash
+python scripts/make_test_token.py --subject test-user-1
+```
+
+Paste it into the **Authorize** box in `/docs`, or into the developer sign-in
+screen in the app. Development only, and it never leaves your machine.
 
 ---
 
-## Safety constraints
+## Rules the code doesn't break
 
-Four constraints from the SRS override ordinary engineering preference. Each is
-enforced structurally rather than by convention, because a convention is
-something a future contributor can be unaware of.
+Four of these. They're not style preferences, and each one is enforced by the
+structure of the code rather than by everyone remembering.
 
-### CON-001 — Zero-Save Policy
+### Face photos are never stored
 
-Face images are never written to disk, object storage, cache, log, or backup.
-They exist in memory for the duration of one request.
+Not to disk, not to a cache, not to a log, not to a backup. A photo exists in
+memory for the length of one request and then it's gone.
 
-- No model in `app/db/models/` has an image-shaped or binary column, and
-  `tests/test_onboarding.py::test_no_table_has_an_image_shaped_column` fails the
-  build if one appears.
-- `PreparedImage.__repr__` is overridden so an exception traceback cannot render
-  the payload.
-- FR-CAM-004 also requires the analysis provider to have retention disabled.
-  `/readyz` asserts this rather than assuming it.
+There is no column anywhere in the database capable of holding an image, and a
+test fails the build if one appears. The object that carries image bytes
+overrides how it prints itself, so an unexpected crash can't dump a photo into
+a log file. And the app refuses to report itself healthy unless the vision
+provider is configured with data retention switched off — a promise about
+storage means nothing if the third party keeps a copy.
 
-### CON-002 — No diagnosis
+### The app never names a condition as a finding
 
-The system never names a condition as a finding. Clinical signal identifiers
-(`PIGMENT_PATCHES`, `SCALING_PLAQUES`, …) name an **appearance**, not a
-condition, and are internal — the user sees only a plain-language observation.
+When the analysis sees something outside cosmetic range, it reports what it
+*looks like*, not what it *is*: "areas visibly darker than the surrounding
+skin", not "melasma". The internal identifiers describe appearance and never
+reach the screen.
 
-Where condition names appear at all, they come from the Appendix H association
-table under FR-AI-007, never from the model. The Appendix G response schema in
-`app/schemas/analysis.py` has no field capable of carrying one, and rejects a
-response that tries.
+Condition names, where they appear at all, come from a reviewed lookup table
+and only ever as a list of possibilities with fixed wording around them. The
+format the analysis returns has no field capable of carrying a diagnosis, and
+rejects a response that tries to add one.
 
-### CON-003 — No clinical judgement in application code
+### Clinical decisions live in JSON, not Python
 
-Rules, thresholds, and scoring live in `app/clinical/` as versioned JSON. Python
-interprets them; it does not encode them.
+Which ingredient suits which skin type, which ones a pregnant user shouldn't
+use, how the skin type questionnaire is scored — all of it sits in
+`app/clinical/` as versioned files. The Python reads those files; it doesn't
+contain the decisions.
 
-If you find yourself writing `if concern == "ACNE"` in `app/engine/`, the logic
-belongs in the matrix instead. The point of the split is that a reviewer who
-does not read Python can still audit the clinical content.
+The point is that a dermatologist reviewing this content shouldn't have to read
+code. Those folders deliberately contain no `.py` files at all.
 
-### CON-004 — Single analysis interface
+If you catch yourself writing `if concern == "ACNE"` in the rules engine, the
+logic belongs in the JSON instead.
 
-Every analysis task goes through `AnalysisProvider`. A task can move between an
-internal model and a hosted provider by configuration alone, with no change to
-triage, the rules engine, or the client.
+### One way in and out for image analysis
+
+Every analysis task goes through a single interface. Moving a task between our
+own model and a hosted provider is a configuration change — nothing in the
+triage logic, the rules engine, or the app has to know which one answered.
 
 ---
 
-## Architecture
+## How it's put together
 
 ```
-Client  ──►  API (app/api)          request handling only
-              │
-              ▼
-            Services (app/services) orchestration, fixed stage order
-              │
-              ├──►  Providers (app/providers)  vision analysis
-              ├──►  Engine (app/engine)        deterministic rules
-              └──►  DB (app/db)                persistence
-                      │
-                      ▼
-                    Clinical content (app/clinical)   JSON, no code
+App  ──►  API layer          takes requests, returns responses, no logic
+           │
+           ▼
+         Services            orchestration, and the fixed order below
+           │
+           ├──►  Providers   image analysis
+           ├──►  Engine      the deterministic rules
+           └──►  Database
+                   │
+                   ▼
+                 Clinical content    JSON, reviewed separately
 ```
 
-### The scan pipeline order is fixed
-
-SRS 4.2 specifies the order, and a stage that stops the flow prevents every
-later stage. The ordering is not incidental:
+### The scan runs in a fixed order
 
 ```
 quota check → referral flag → capture gate → image analysis
   → clinical signal check → rules engine → product matching → quota decrement
 ```
 
-- FR-TRI-001 — the referral check precedes capture, so a flagged user never has
-  a photograph taken at all.
-- FR-SUB-002 — eligibility is evaluated before the provider is called, so an
-  ineligible request never costs a provider call.
-- FR-SUB-003 / FR-TRI-004 — the quota decrements last, and only when a routine
-  is actually shown. Referral, unusable, and error outcomes leave it untouched:
-  nobody should be charged for being told to see a doctor.
+The order isn't arbitrary. The referral check comes before capture, so someone
+who told us about an open wound never has a photo taken at all. Eligibility is
+checked before the provider is called, so a request that can't succeed doesn't
+cost anything. And the quota decrements last, only when a routine is actually
+shown — nobody should be charged for being told to see a doctor.
 
-### Authentication
+### Sign-in
 
-Sign-in happens client-side against Supabase using Google or Apple. This backend
-verifies the resulting JWT signature and reads the subject claim. It never
-issues a token, never verifies a password, and never stores credential material
-(FR-ONB-001).
+Handled by Supabase. Google, Apple, or an email and password. Supabase issues a
+signed token; this backend checks the signature and reads who it belongs to. It
+never sees a password, and there is no code here that could store one.
 
-Password authentication was considered and rejected: it conflicts with
-FR-ONB-001 and weakens the FR-ONB-003 age gate, since a new email address is far
-easier to obtain than a new Google account.
+Supabase signs those tokens with a private key and publishes the matching
+public key, which the backend fetches once and caches. It also still accepts
+the older shared-secret format, and that's deliberate rather than left over:
+it's what makes the local test tokens above possible.
 
 ---
 
-## Project layout
+## Layout
 
 ```
-app/
-├── api/v1/routes/     endpoints — request handling, no business logic
-├── clinical/          versioned JSON. No Python here by design (CON-003)
-│   ├── matrix/        Appendix F ingredient rules
-│   ├── associations/  Appendix H signal → condition table
-│   ├── questionnaire/ FR-ONB-006 skin type instrument
-│   └── copy/          IF-UI-001 single string resource
-├── core/              enums, config, errors, logging, token verification
-├── db/models/         SQLAlchemy models mapped to SRS 6.2
-├── engine/            deterministic rules engine (FR-REC-001 … 004)
-├── providers/         analysis backends behind one interface (CON-004)
-├── schemas/           Pydantic request/response shapes
-└── services/          orchestration, quota, content loading
-```
+skincare-advisor-backend/
+├── app/
+│   ├── api/v1/routes/     endpoints
+│   ├── clinical/          JSON content — no Python here by design
+│   ├── core/              config, errors, logging, token checking
+│   ├── db/models/         database tables
+│   ├── engine/            rules engine
+│   ├── providers/         image analysis backends
+│   ├── schemas/           request and response shapes
+│   └── services/          orchestration
+├── docs/                  decisions and feature records
+├── scripts/
+└── tests/
 
-`app/clinical/matrix/` and `app/clinical/associations/` deliberately contain no
-`__init__.py`. They hold content, not code, and the absence of a `.py` file is
-the visible form of CON-003.
+skincare-advisor-frontend/
+├── components/            shared UI pieces
+├── lib/                   API client, auth state, design tokens
+└── screens/
+    └── onboarding/
+```
 
 ---
 
@@ -227,95 +258,109 @@ the visible form of CON-003.
 pytest
 ```
 
-43 tests, ~2.5 seconds. Each names the requirement and acceptance criterion it
-covers, so the suite doubles as the SRS Section 7 evidence trail.
+43 tests, about two and a half seconds. Each one names what it's checking and
+why, so the suite doubles as evidence of what's been verified.
 
-Tests run against in-memory SQLite rather than Supabase — fast, isolated, and
-runnable offline. `JSONType` in the models carries a SQLite variant to make this
-work. The trade-off is that Postgres-specific behaviour (enums, JSONB indexing,
-migrations) is not covered, so run the full flow through `/docs` against the real
+They run against an in-memory database rather than Supabase — fast, isolated,
+and they work offline. The trade-off is that Postgres-specific behaviour and
+migrations aren't covered, so the full flow gets walked through against the real
 database once per feature.
 
-Two tests deserve attention if they ever fail:
+There's also a Postman collection in `docs/postman/` with 34 requests. It mints
+its own tokens and cleans up after itself, so it can be run repeatedly. Import
+it, set `baseUrl`, `jwtSecret` and `consentVersion` in an environment, and hit
+Run. **Don't commit the exported environment** — it holds the secret.
 
-- `test_under_thirteen_succeeds_and_blocks_scan_access` — asserts **200**, not
-  403. Rejecting an under-13 date would state the threshold by implication and
-  hand the user a second attempt at clearing it. FR-ONB-003 requires the minimum
-  age never to be stated. If someone "fixes" this into a rejection, this test is
-  what catches it.
-- `test_no_table_has_an_image_shaped_column` — the structural half of CON-001.
-  SRS Section 7 verifies this by inspection; an inspection performed once is
-  worth less than an assertion that runs on every commit.
+Two tests are worth knowing about before you touch them:
+
+**The under-age test expects a success, not an error.** When someone enters a
+date of birth below the minimum, the request succeeds, the account is created,
+and scanning is quietly switched off. It looks wrong. It isn't: an error message
+tells the user exactly what to type on their second attempt, which defeats the
+entire point of the check. If someone "fixes" this into a rejection, that test
+is what catches it.
+
+**The no-image-column test** walks every table looking for anything that could
+hold a photo. It's the structural half of the storage promise, and it runs on
+every commit rather than being checked by hand once.
 
 ---
 
-## Database migrations
+## Database
 
 ```bash
-alembic upgrade head                              # always before generating
+alembic upgrade head                              # always do this first
 alembic revision --autogenerate -m "description"
 ```
 
-Read the generated file before applying it. Autogenerate infers intent from a
-schema diff and is occasionally wrong — once tables exist, it will sometimes
-propose dropping a column it cannot account for.
+Read the generated migration before applying it. Autogenerate works out what
+changed by comparing your models to the live schema, and it occasionally gets
+that wrong — once tables exist it will sometimes propose dropping a column it
+can't account for.
 
-`alembic/env.py` takes the database URL from `app.core.config` rather than
-`alembic.ini`, because `alembic.ini` is committed and the URL contains the
-password.
+The database URL comes from `.env`, not from `alembic.ini`, because
+`alembic.ini` is committed and the URL contains the password.
 
-### Supabase connection pooler
+### One gotcha worth knowing
 
-The pooler runs pgbouncer in transaction mode, which does not support prepared
-statements. asyncpg caches them per connection by default, so the second request
-reuses a statement name the new backend has never seen.
+Supabase's connection pooler doesn't support prepared statements, and the
+Postgres driver uses them by default. The result is a confusing error on the
+*second* request, not the first.
 
-`PGBOUNCER_SAFE_CONNECT_ARGS` in `app/db/session.py` disables the cache, and
-`alembic/env.py` imports the same constant. Defining it once matters: Alembic
-builds its own engine, and a fix applied in only one place leaves migrations
-failing while the application works.
-
----
-
-## Known gaps
-
-Carried from SRS Appendix D, plus findings from implementation.
-
-### Blocking
-
-| Item | Blocks | Note |
-| --- | --- | --- |
-| **Section 5 is missing** | FR-AI-010, FR-AI-007, FR-CAM-003 | The SRS jumps from 4.9 to 6. Sixteen NFR identifiers are referenced as dependencies but never defined. NFR-SAFE-008 supplies the model deployment thresholds — there are none, so the gate has nothing to compare against. |
-| OI-002 | Feature 5 | The Appendix F rules matrix is unpopulated. `rules_matrix.v0.json` is a valid empty matrix so the pipeline runs end to end. |
-| OI-012 | FR-AI-007 | The Appendix H association table is unpopulated. Every row ships disabled, which is also the correct default. |
-| OI-014 … 018 | Internal models | No dataset register, and eight of the nine cosmetic concerns have no identified dataset. Every task currently routes to the hosted provider, and FR-AI-010 refuses to activate an internal model without a recorded evaluation. |
-| DEP-003 | FR-ONB-008 | No practitioner engaged. The unsubstantiated state is implemented and is correct until one is. |
-
-### Found during implementation
-
-- **FR-ONB-002 contradicts FR-ONB-003.** FR-ONB-002 requires an age between 13
-  and 80; FR-ONB-003 describes behaviour for a confirmed age of 12, which cannot
-  exist if input rejects it. Resolved by accepting the date and withdrawing scan
-  access silently — rejecting it would also teach the user what to enter next
-  time. Needs an SRS amendment.
-- **`SafetyAnswerChange` is a seventh entity.** SRS 6.1 lists six. It exists
-  because safety answers are updatable by decision, and `referral_flag` is what
-  FR-TRI-001 checks before any image is captured — an unrecorded change to it
-  would leave no way to tell a correction from a bypass. Needs adding to 6.1
-  and 6.2.
-- **The FR-ONB-006 questionnaire is a draft.** OI-005 left the items undrafted.
-  `skin_type.v0.json` adapts the sebum axis of the Baumann framework (REF-004,
-  CC BY); every item and scoring rule carries `needs_review` and requires
-  clinical sign-off under DEP-003 before baseline.
-- **`date_of_birth` encryption is undecided.** SRS 6.2 marks it encrypted at
-  rest. Supabase encrypts the volume, which covers a stolen disk; column-level
-  encryption is a separate decision not yet taken.
+The fix is one setting, defined once in `app/db/session.py` and imported by
+Alembic. Defining it in only one place is the point — Alembic builds its own
+connection, and fixing just one of them leaves migrations failing while the app
+works fine, which is a genuinely annoying thing to debug.
 
 ---
 
-## References
+## What's missing
 
-- `SRS-AISA-001 v1.3` — the governing specification
-- REF-001 — AAD acne management guidelines (2024)
-- REF-002 — NICE NG198, acne vulgaris management
-- REF-004 — Baumann Skin Type Indicator (CC BY)
+Honest list. Some of these are outside the code.
+
+**The ingredient rules don't exist.** The routine engine is written and tested,
+but the actual clinical content — which ingredient for which skin type, at what
+strength, which combinations to avoid — hasn't been compiled yet. The engine
+currently loads an empty ruleset and reports every step as omitted, which is
+correct behaviour for empty content but obviously not a product.
+
+**The condition lookup table is empty**, and every row ships disabled. That's
+also the right default: naming conditions changes what this app legally is, and
+nothing gets enabled without a reviewed source and a measured accuracy figure.
+
+**No clinical reviewer yet.** The app therefore makes no claim to be clinically
+reviewed, which is enforced in code — the claim only appears if a signed review
+record exists for the current ruleset.
+
+**The skin type questionnaire is a draft.** Six questions adapted from a
+published framework, with every item and every scoring threshold marked as
+needing review. It works and it's deterministic; it hasn't been validated.
+
+**No training data for the image analysis.** Eight of the nine cosmetic
+concerns have no identified dataset. Everything currently routes to a hosted
+provider, and the code refuses to activate an internal model that has no
+recorded evaluation.
+
+**The specification has a missing section.** The non-functional requirements —
+performance targets, accuracy thresholds, security requirements — are referenced
+throughout but were never written. Four of them block real work, most
+importantly the accuracy thresholds a model would have to meet before it could
+be used at all.
+
+**Two smaller things.** Whether the date of birth needs encrypting at the column
+level is undecided. And leaked-password checking is a paid Supabase feature,
+currently off.
+
+---
+
+## Reading further
+
+- `docs/architecture-decisions.md` — every significant decision, why it was
+  made, and what it cost
+- `docs/features/01-onboarding.md` — what was built, what was verified, what
+  wasn't
+- `docs/postman/` — the API test collection
+```
+
+---
+
