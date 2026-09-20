@@ -56,6 +56,22 @@ class Settings(BaseSettings):
     # instead of silently.
     provider_retention_disabled: bool = False
 
+    # --- Analysis routing (FR-AI-004, FR-AI-010) ---------------------------
+    # `analysis_plan` is the comma-separated list of tasks one scan runs.
+    # COMBINED is the default and the only value that satisfies OBJ-002's
+    # single analysis call per scan; splitting it into COSMETIC_CONCERNS and
+    # CLINICAL_SIGNAL_SCREENING doubles the provider spend and exists for the
+    # Appendix I assignment, where a trained model takes one of them.
+    analysis_plan: str = "COMBINED"
+
+    # Tasks assigned to the internal inference service. Empty in release 1.0:
+    # FR-AI-010 forbids serving a task from a model with no recorded evaluation
+    # meeting NFR-SAFE-008, and OI-016 records that no evaluation set
+    # representative of the target population exists yet. The router falls back
+    # to the hosted provider and records the reason, so naming a task here
+    # before its evaluation exists changes the log line, not the behaviour.
+    internal_model_tasks: str = ""
+
     # --- Quota (FR-SUB-001, FR-SUB-004) ------------------------------------
     quota_enforced: bool = True
     default_scan_allowance: int = 1

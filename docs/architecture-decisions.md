@@ -55,3 +55,38 @@ signature stops meaning anything.
 *Cost:* one blocking HTTP call on first use per process. An async fetch would
 need a lock to stop a cold start firing several at once — more machinery than
 a once-per-process call warrants.
+
+### ADR-014 — Capture gate runs after the shutter, not before
+**FR-CAM-001, FR-CAM-002, FR-CAM-004** · Accepted
+
+FR-CAM-001 requires the quality check to run on preview frames, before a photo
+is taken. It does not, on this hardware. `frame.toArrayBuffer()` fails with
+"Failed to lock HardwareBuffer for reading" on every frame — on the emulator
+and on a physical TECNO device, in RGB and in YUV, with and without a resize
+plugin. Some Android camera drivers do not expose a CPU-readable buffer and
+vision-camera has no fallback for them.
+
+So the gate moved: the photo is taken, shrunk natively, measured, and either
+prepared for upload or discarded with a prompt. The user sees the same
+instruction, one tap later.
+
+The shrink matters as much as the move. jpeg-js is pure JavaScript, and
+decoding a full camera photo blocks the JS thread for seconds — the screen
+simply freezes with no error. Resizing to 32px in native code first brought the
+check from ~3000ms to **~480ms**.
+
+The live path is left wired. A phone whose driver does allow the lock gets
+pre-capture feedback for free, and capture is permitted when the live gate
+never ran — refusing every photo on a device that cannot deliver frames would
+be worse than one unvetted shutter press.
+
+*Cost:* one wasted tap when a photo is rejected, which is precisely what
+FR-CAM-001 exists to prevent. FR-CAM-002's ≥24fps preview target could not be
+measured at all, since the frame processor delivers nothing here. **Neither is
+a safety regression:** no rejected image is transmitted, and the captured file
+is deleted on every path including failure, so FR-CAM-004 holds.
+
+*Also cost:* three separate failures during development presented identically —
+a spinner that never stopped. Every step now runs behind a timeout, because a
+hung native call, a blocking decode and a request to a missing endpoint are
+indistinguishable from the screen and need different fixes.

@@ -256,3 +256,46 @@ class ScanIneligibilityReason(str, Enum):
     SCAN_ACCESS_BLOCKED = "SCAN_ACCESS_BLOCKED"
     REFERRAL_REQUIRED = "REFERRAL_REQUIRED"
     QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"
+
+class AnalysisTask(str, Enum):
+    """
+    FR-AI-004. The unit of routing.
+
+    A task is a question put to an analysis backend, not a backend itself.
+    Routing assigns each task to the internal inference service or to a hosted
+    provider, and the requirement is that moving one between the two changes
+    no code in the triage stage, the rules engine, or the client.
+
+    COMBINED is the baseline and exists because of OBJ-002, which asks for a
+    single analysis call per scan. Running COSMETIC_CONCERNS and
+    CLINICAL_SIGNAL_SCREENING as separate tasks would mean two provider calls
+    for every scan, at twice the cost, to answer questions one prompt can carry.
+
+    The split tasks are not dead code waiting for a rewrite. Appendix I assigns
+    acne detection and clinical signal screening to trained models and leaves
+    the other eight concerns with the hosted provider, and that assignment can
+    only be expressed by splitting. The router picks whichever shape the
+    current configuration describes.
+    """
+
+    COMBINED = "COMBINED"
+    COSMETIC_CONCERNS = "COSMETIC_CONCERNS"
+    ACNE_DETECTION = "ACNE_DETECTION"
+    CLINICAL_SIGNAL_SCREENING = "CLINICAL_SIGNAL_SCREENING"
+
+
+class ObservationSource(str, Enum):
+    """
+    DR-008. Where the text on the referral screen came from.
+
+    PROVIDER means the analysis backend's own wording survived validation.
+    CURATED means it did not, and the fixed text for that signal identifier was
+    substituted instead.
+
+    Recorded on the scan log because the two carry different weight. A referral
+    whose observation was substituted is one where the provider tried to name a
+    condition, and a run of those is a prompt problem worth seeing.
+    """
+
+    PROVIDER = "PROVIDER"
+    CURATED = "CURATED"

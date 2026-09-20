@@ -9,6 +9,7 @@ a table Alembic will silently never create.
 
 from app.db.base import Base
 from app.db.models.review import ReviewRecord
+from app.db.models.scan_log import ScanLog
 from app.db.models.user import SafetyAnswerChange, User
 
-__all__ = ["Base", "ReviewRecord", "SafetyAnswerChange", "User"]
+__all__ = ["Base", "ReviewRecord", "ScanLog", "SafetyAnswerChange", "User"]
