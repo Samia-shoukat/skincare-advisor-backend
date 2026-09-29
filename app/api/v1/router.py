@@ -11,9 +11,10 @@ of what the API actually exposes.
 
 from fastapi import APIRouter
 
-from app.api.v1.routes import content, onboarding, scan
+from app.api.v1.routes import content, onboarding, routine, scan
 
 api_router = APIRouter(prefix="/v1")
 api_router.include_router(onboarding.router)
 api_router.include_router(content.router)
 api_router.include_router(scan.router)
+api_router.include_router(routine.router)

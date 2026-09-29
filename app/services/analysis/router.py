@@ -274,11 +274,19 @@ class AnalysisRouter:
                 continue
 
             try:
-                results.append(await provider.analyse(image, task))
+                result = await provider.analyse(image, task)
             except ProviderUnavailable as exc:
                 failures.append(f"{task.value}: {exc}")
                 continue
 
+            # FR-AI-009. The artefact identity comes from the provider's answer,
+            # not from the routing decision -- a decision made before the call
+            # cannot know which version actually served it, and "which version
+            # served it" is the whole requirement.
+            decision.model_id = result.model_id
+            decision.model_version = result.model_version
+
+            results.append(result)
             decisions.append(decision)
 
         if not results:

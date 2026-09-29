@@ -1,0 +1,94 @@
+{
+  "version": "0.1.0-unverified",
+  "_about": [
+    "Seed for the products table. FR-REC-005, DR-006. Closes OI-006 as a first draft.",
+    "",
+    "UNVERIFIED. These are real, widely sold products, but local availability, current",
+    "formulation, and price tier in the target market have NOT been checked (DEP-004).",
+    "Before release, each entry must be confirmed against a local pharmacy or retailer",
+    "and its ingredient list checked against the current packaging.",
+    "",
+    "Each product lists the matrix ingredient keys it contains. The first entry is the",
+    "PRIMARY ingredient -- the routine step it serves. `percent` is the concentration",
+    "where the product states one, or null. A product whose primary percent exceeds the",
+    "rule's maxPercent is never shown; a product containing any excluded ingredient is",
+    "never shown (FR-REC-005: the catalogue never overrides a safety exclusion).",
+    "",
+    "Removing an entry from this file deactivates the product (isActive = false). It is",
+    "never deleted, because past routines refer to it (DR-005)."
+  ],
+  "products": [
+    { "id": "simple-refreshing-facial-wash", "brand": "Simple", "name": "Kind to Skin Refreshing Facial Wash", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "gentle_cleanser", "percent": null }] },
+    { "id": "cerave-hydrating-cleanser", "brand": "CeraVe", "name": "Hydrating Facial Cleanser", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "gentle_cleanser", "percent": null }] },
+
+    { "id": "simple-hydrating-light-moisturiser", "brand": "Simple", "name": "Kind to Skin Hydrating Light Moisturiser", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "moisturiser_light", "percent": null }] },
+    { "id": "neutrogena-hydro-boost-water-gel", "brand": "Neutrogena", "name": "Hydro Boost Water Gel", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "moisturiser_light", "percent": null }] },
+
+    { "id": "cetaphil-moisturising-cream", "brand": "Cetaphil", "name": "Moisturising Cream", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "moisturiser_barrier", "percent": null }] },
+    { "id": "cerave-moisturising-cream", "brand": "CeraVe", "name": "Moisturising Cream", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "moisturiser_barrier", "percent": null }] },
+
+    { "id": "neutrogena-ultra-sheer-spf50", "brand": "Neutrogena", "name": "Ultra Sheer Dry-Touch Sunscreen SPF 50+", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "sunscreen_spf30", "percent": null }] },
+    { "id": "lrp-anthelios-uvmune-spf50", "brand": "La Roche-Posay", "name": "Anthelios UVMune 400 Invisible Fluid SPF 50+", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "sunscreen_spf30", "percent": null }] },
+
+    { "id": "minimalist-niacinamide-5", "brand": "Minimalist", "name": "Niacinamide 5% Serum", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "niacinamide", "percent": 5 }] },
+    { "id": "the-ordinary-niacinamide-10-zinc", "brand": "The Ordinary", "name": "Niacinamide 10% + Zinc 1%", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "niacinamide", "percent": 10 }],
+      "_note": "Above the 5% maxPercent in the matrix, so it is never shown. Kept to demonstrate the strength filter." },
+    { "id": "lrp-pure-niacinamide-10", "brand": "La Roche-Posay", "name": "Pure Niacinamide 10 Serum", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "niacinamide", "percent": 10 }],
+      "_note": "Also above 5%. The niacinamide step therefore has no PREMIUM option and shows the generic alternative -- FR-REC-005's missing-tier path." },
+
+    { "id": "cosrx-low-ph-gel-cleanser", "brand": "COSRX", "name": "Low pH Good Morning Gel Cleanser", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "gentle_cleanser", "percent": null }] },
+    { "id": "cosrx-oil-free-lotion", "brand": "COSRX", "name": "Oil-Free Ultra-Moisturizing Lotion", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "moisturiser_light", "percent": null }] },
+    { "id": "beauty-of-joseon-relief-sun", "brand": "Beauty of Joseon", "name": "Relief Sun: Rice + Probiotics SPF 50+", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "sunscreen_spf30", "percent": null }] },
+    { "id": "beauty-of-joseon-glow-serum", "brand": "Beauty of Joseon", "name": "Glow Serum: Propolis + Niacinamide 2%", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "niacinamide", "percent": 2 }],
+      "_note": "At 2% this sits under the 5% cap, so it is the premium niacinamide option the 10% serums could not be." },
+
+    { "id": "the-ordinary-azelaic-10", "brand": "The Ordinary", "name": "Azelaic Acid Suspension 10%", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "azelaic_acid", "percent": 10 }] },
+    { "id": "paulas-choice-azelaic-10", "brand": "Paula's Choice", "name": "10% Azelaic Acid Booster", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "azelaic_acid", "percent": 10 }] },
+
+    { "id": "the-ordinary-salicylic-2", "brand": "The Ordinary", "name": "Salicylic Acid 2% Solution", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "salicylic_acid", "percent": 2 }] },
+    { "id": "paulas-choice-2-bha", "brand": "Paula's Choice", "name": "Skin Perfecting 2% BHA Liquid Exfoliant", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "salicylic_acid", "percent": 2 }] },
+
+    { "id": "benzac-ac-5", "brand": "Benzac", "name": "AC 5% Gel", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "benzoyl_peroxide", "percent": 5 }] },
+    { "id": "panoxyl-creamy-wash-4", "brand": "PanOxyl", "name": "Acne Creamy Wash 4%", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "benzoyl_peroxide", "percent": 4 }] },
+
+    { "id": "differin-adapalene-01", "brand": "Differin", "name": "Adapalene Gel 0.1%", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "adapalene", "percent": 0.1 }] },
+    { "id": "lrp-effaclar-adapalene-01", "brand": "La Roche-Posay", "name": "Effaclar Adapalene Gel 0.1%", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "adapalene", "percent": 0.1 }] },
+
+    { "id": "the-ordinary-glycolic-7", "brand": "The Ordinary", "name": "Glycolic Acid 7% Exfoliating Toner", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "glycolic_acid", "percent": 7 }] },
+    { "id": "pixi-glow-tonic", "brand": "Pixi", "name": "Glow Tonic", "priceTier": "PREMIUM",
+      "ingredients": [{ "ingredient": "glycolic_acid", "percent": 5 }] },
+
+    { "id": "the-ordinary-ascorbyl-glucoside-12", "brand": "The Ordinary", "name": "Ascorbyl Glucoside Solution 12%", "priceTier": "BUDGET",
+      "ingredients": [{ "ingredient": "vitamin_c", "percent": 12 }] },
+    { "id": "lrp-pure-vitamin-c10", "brand": "La Roche-Posay", "name": "Pure Vitamin C10 Serum", "priceTier": "PREMIUM",
+      "ingredients": [
+        { "ingredient": "vitamin_c", "percent": 10 },
+        { "ingredient": "salicylic_acid", "percent": null }
+      ],
+      "_note": "Contains salicylic acid as a secondary ingredient, so it is never shown: a second active in one product would break the one-active limit, and salicylic acid is pregnancy-restricted. Demonstrates the whole-product filter." }
+  ]
+}

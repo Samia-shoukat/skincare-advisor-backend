@@ -23,8 +23,9 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import CurrentUser, SessionDep, SettingsDep, TokenDep
+from app.api.deps import AuthAdminDep, CurrentUser, SessionDep, SettingsDep, TokenDep
 from app.core.errors import (
+    AccountDeletionFailed,
     ConsentVersionMismatch,
     ImmutableField,
     InvalidDateOfBirth,
@@ -43,6 +44,8 @@ from app.schemas.onboarding import (
     SkinTypeRequest,
     SkinTypeResponse,
 )
+from app.services.account_deletion import erase_user_data
+from app.services.auth_admin import AuthDeletionFailed
 from app.services.questionnaire import IncompleteAnswers, get_questionnaire, score
 
 logger = logging.getLogger(__name__)
@@ -353,13 +356,26 @@ async def get_profile(user: CurrentUser) -> ProfileResponse:
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account(user: CurrentUser, session: SessionDep) -> None:
+async def delete_account(user: CurrentUser, session: SessionDep, auth_admin: AuthAdminDep) -> None:
     """
-    DR-002. Immediate hard delete, by decision.
+    DR-002. Immediate hard delete, by decision -- and all of it.
 
-    Scan logs, routines, and safety answer audit rows go with it via
-    `ondelete="CASCADE"`. Nothing is retained and nothing is anonymised and
-    kept — "delete" means the row is gone.
+    1. Every row belonging to the user is deleted (flushed, not yet committed).
+    2. The Supabase sign-in is deleted, so they cannot log back in to an empty
+       account. Google Play requires the account itself to go, not only data.
+    3. The request's session commits.
+
+    If step 2 fails, the error rolls step 1 back and nothing is removed. A
+    half-deleted account -- data gone, login still working, or the reverse --
+    is worse than a failed request the user can simply retry.
+
+    Nothing is retained and nothing is anonymised and kept: "delete" means gone.
     """
-    await session.delete(user)
+    auth_id = user.auth_id
+    await erase_user_data(session, user)
+    try:
+        await auth_admin.delete_user(auth_id)
+    except AuthDeletionFailed as exc:
+        logger.error("account deletion aborted, sign-in removal failed: %s", exc)
+        raise AccountDeletionFailed() from None
     logger.info("account deleted")

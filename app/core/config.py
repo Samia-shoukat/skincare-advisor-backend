@@ -46,9 +46,28 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_audience: str = "authenticated"
 
+    # DR-002 and Google Play's account-deletion policy. Deleting an account
+    # must remove the Supabase sign-in too, not only our rows, and that needs
+    # the service-role key. SERVER ONLY: this key bypasses every Supabase
+    # security rule and must never reach the mobile app or a git commit.
+    supabase_service_role_key: str = ""
+
+    # --- Support and legal -------------------------------------------------
+    # FR-ONB-003 shows this to restricted users; the privacy policy and the
+    # account-deletion page list it. /readyz fails in production while it is
+    # still the placeholder.
+    support_email: str = "support@example.com"
+    # Shown in the privacy policy as the party responsible for the data.
+    operator_name: str = "AI Skincare Advisor project team"
+
     # --- Hosted vision provider (IF-SW-003, DEP-001) -----------------------
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    # Pinned to a specific stable model, not an alias like "gemini-flash-latest":
+    # an alias can change underneath a deployment, and FR-AI-009's reasoning --
+    # a measured result belongs to a specific model -- applies to hosted models
+    # too. Google retires old models (gemini-2.0-flash now returns 404, which
+    # failed every scan), so check the model list when a scan starts failing.
+    gemini_model: str = "gemini-3.8-flash"
 
     # FR-CAM-004 states the Zero-Save Policy is NOT satisfied if the provider
     # retains inputs. This is asserted at startup rather than assumed, so
@@ -83,12 +102,16 @@ class Settings(BaseSettings):
     rules_matrix_path: str = "app/clinical/matrix/rules_matrix.v0.json"
     associations_path: str = "app/clinical/associations/associations.v0.json"
     questionnaire_path: str = "app/clinical/questionnaire/skin_type.v0.json"
+    # FR-REC-005. Seed file for the products table; see scripts/seed_catalogue.py.
+    catalogue_path: str = "app/clinical/catalogue/catalogue.v0.json"
     rules_matrix_url: str = ""
     rules_matrix_cache_ttl_seconds: int = 300
 
     # --- Consent (FR-ONB-007) ----------------------------------------------
     # Incrementing this re-presents the limitations screen to every user.
     consent_statement_version: str = "1.2"
+    # Only a fallback label for scan logs when no matrix can be loaded at all.
+    # The version in force is read from the matrix itself (FR-REC-006).
     active_matrix_version: str = "0.0.0-empty"
 
     @property

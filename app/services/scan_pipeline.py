@@ -25,22 +25,16 @@ body is read, so that FR-TRI-001 holds in its literal form: a flagged user never
 has an image captured or transmitted. By the time this module runs, they have
 already passed.
 
-## Stages 6 and 7 are not built yet
+## Stages 6 and 7
 
-`generate_routine` is injected and is None in the current build. A scan that
-clears triage therefore ends at stage 5 with no routine, which is recorded as
-ScanOutcome.ERROR and returns PROVIDER_UNAVAILABLE.
+`RoutineService` runs the rules engine, re-checks the FR-REC-004 invariants on
+the result, matches products, and saves the routine. If no service is supplied
+(a misconfiguration, never the production wiring) a cleared scan ends in
+ScanOutcome.ERROR with `pendingStage` recorded, and nobody is charged.
 
-That is the truthful mapping rather than a convenient one. The user asked for a
-routine and did not get one; ScanOutcome has exactly four members and the SRS
-does not permit a fifth; and FR-SUB-003 leaves the allowance untouched on an
-error outcome, so nobody is charged for the gap. The scan log records the stage
-that was missing, so these rows are distinguishable from a real failure.
-
-**The referral path is complete and live.** That is the half that carries the
-safety weight: a user with a clinical signal gets the full FR-TRI-003 screen and
-the FR-TRI-005 consultation summary today, whether or not a routine could have
-been generated for anyone else.
+A routine that fails the invariant check is never shown and never charged for.
+That can only happen if a matrix published at runtime (FR-REC-006) contains an
+unsafe combination the test suite never saw; it is logged at ERROR.
 
 ## What never leaves this module
 
@@ -55,7 +49,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -72,13 +66,9 @@ from app.services.association_table import (
     resolve_associations,
 )
 from app.services.quota import apply_decrement, should_decrement
+from app.services.routine_service import RoutineService, routine_response
 
 logger = logging.getLogger(__name__)
-
-
-# Stage 6/7. Takes the user and the validated concerns, returns a routine.
-# None until the rules engine lands.
-RoutineGenerator = Callable[[User, RoutedAnalysis], Awaitable[dict[str, Any]]]
 
 
 @dataclass
@@ -99,7 +89,7 @@ class ScanResult:
     # where FR-AI-007 permits it, its association list.
     referral_signals: list[dict[str, Any]] = field(default_factory=list)
 
-    # ROUTINE only. Null until the rules engine lands.
+    # ROUTINE only.
     routine: dict[str, Any] | None = None
 
     concerns: list[dict[str, str]] = field(default_factory=list)
@@ -125,12 +115,12 @@ class ScanPipeline:
         self,
         settings: Settings,
         router: AnalysisRouter,
-        generate_routine: RoutineGenerator | None = None,
+        routines: RoutineService | None = None,
     ) -> None:
         self._settings = settings
         self._router = router
-        # Stages 6 and 7. None in the current build; see the module docstring.
-        self._generate_routine = generate_routine
+        # Stages 6 and 7. See the module docstring.
+        self._routines = routines
 
     async def run(
         self,
@@ -184,12 +174,17 @@ class ScanPipeline:
             scan = await self._record(session, user, ScanOutcome.UNUSABLE, analysis)
             raise ImageUnusable(detail={"scanId": scan.id})
 
-        # FR-AI-002: where every returned concern was discarded, the scan is
-        # treated as unusable rather than producing an empty routine. Signals
-        # are checked first, because a scan can legitimately return no cosmetic
-        # concerns *and* a clinical signal, and that is a referral, not a
-        # retake.
-        if not analysis.result.signals and not analysis.result.concerns:
+        # FR-AI-002: where every returned concern was DISCARDED, the scan is
+        # treated as unusable rather than producing an empty routine.
+        #
+        # Only discarded, not merely absent. A provider that looked and found
+        # no concerns has given a valid answer, and that user still gets the
+        # base routine (cleanse, moisturise, sunscreen). Treating "none found"
+        # as unusable would send someone with clear skin round the retake loop
+        # forever. A signal also counts as a usable finding -- that is a
+        # referral, not a retake.
+        all_discarded = bool(analysis.discards.unknown_concerns) and not analysis.result.concerns
+        if all_discarded and not analysis.result.signals:
             logger.info("no usable findings survived validation; treating as unusable")
             scan = await self._record(session, user, ScanOutcome.UNUSABLE, analysis)
             raise ImageUnusable(detail={"scanId": scan.id})
@@ -204,7 +199,7 @@ class ScanPipeline:
             return await self._refer(session, user, analysis)
 
         # --- stages 6 and 7: rules engine and product matching ------------
-        if self._generate_routine is None:
+        if self._routines is None:
             scan = await self._record(
                 session,
                 user,
@@ -217,7 +212,17 @@ class ScanPipeline:
             )
             raise ProviderUnavailableError(detail={"scanId": scan.id, "stage": "RULES_ENGINE"})
 
-        routine = await self._generate_routine(user, analysis)
+        built = await self._routines.build(session, user, analysis)
+        if built.violations:
+            scan = await self._record(
+                session,
+                user,
+                ScanOutcome.ERROR,
+                analysis,
+                pending_stage="INVARIANT_CHECK",
+                matrix_version=built.matrix_version,
+            )
+            raise ProviderUnavailableError(detail={"scanId": scan.id, "stage": "INVARIANT_CHECK"})
 
         # --- stage 8: quota decrement -------------------------------------
         # Last, and only here. FR-SUB-003 ties it to a routine that was
@@ -231,16 +236,30 @@ class ScanPipeline:
             analysis,
             idempotency_key=idempotency_key,
             quota_decremented=decremented,
+            matrix_version=built.matrix_version,
         )
+        row = await self._routines.save(session, user, scan, built)
 
         return ScanResult(
             outcome=ScanOutcome.ROUTINE,
             scan_id=scan.id,
-            routine=routine,
+            routine=routine_response(row),
             concerns=_concerns_payload(analysis),
             scans_remaining=user.scans_remaining,
             quota_decremented=decremented,
         )
+
+    async def aclose(self) -> None:
+        await self._router.aclose()
+
+    async def _current_matrix_version(self) -> str:
+        if self._routines is None:
+            return self._settings.active_matrix_version
+        try:
+            return await self._routines.matrix_version()
+        except Exception:  # an unloadable matrix must not stop a referral being logged
+            logger.exception("could not resolve matrix version for scan log")
+            return self._settings.active_matrix_version
 
     # ------------------------------------------------------------------
     # Referral
@@ -314,6 +333,7 @@ class ScanPipeline:
         idempotency_key: str | None = None,
         quota_decremented: bool = False,
         pending_stage: str | None = None,
+        matrix_version: str | None = None,
     ) -> ScanLog:
         """
         Write the audit row. SRS 6.2, and the evidence for most of Section 4.5.
@@ -327,7 +347,10 @@ class ScanPipeline:
         scan = ScanLog(
             user_auth_id=user.auth_id,
             outcome=outcome,
-            matrix_version=self._settings.active_matrix_version,
+            # FR-REC-006: the version actually in force. Resolved from the
+            # matrix store even on referral and error rows, so every scan can
+            # be placed against the rules that were active.
+            matrix_version=matrix_version or await self._current_matrix_version(),
             idempotency_key=idempotency_key,
             quota_decremented=quota_decremented,
         )
@@ -395,7 +418,16 @@ class ScanPipeline:
             scan.discards = {**(scan.discards or {}), "pendingStage": pending_stage}
 
         session.add(scan)
-        await session.flush()
+
+        if outcome in (ScanOutcome.UNUSABLE, ScanOutcome.ERROR):
+            # These paths end in a raised AppError, and the session dependency
+            # rolls back on any exception -- which would discard exactly the
+            # rows FR-AI-001 and FR-AI-003 most need kept. Committed now
+            # instead. Safe because no other write is pending on these paths:
+            # the decrement only happens on ROUTINE.
+            await session.commit()
+        else:
+            await session.flush()
 
         logger.info(
             "scan %s outcome=%s concerns=%d signals=%d decremented=%s",
@@ -415,4 +447,4 @@ def _concerns_payload(analysis: RoutedAnalysis) -> list[dict[str, str]]:
     ]
 
 
-__all__ = ["ScanPipeline", "ScanResult", "RoutineGenerator", "should_decrement"]
+__all__ = ["ScanPipeline", "ScanResult", "should_decrement"]

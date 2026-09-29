@@ -11,7 +11,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.deps import close_scan_pipeline
 from app.api.v1.router import api_router
+from app.api.v1.routes.legal import router as legal_router
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler, unhandled_error_handler
 from app.db.session import check_connection, dispose_engine
@@ -37,6 +39,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    await close_scan_pipeline()
     await dispose_engine()
     logger.info("shutting down")
 
@@ -68,6 +71,8 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+# Public documents, outside /v1 so their URLs never change (Play Store links them).
+app.include_router(legal_router)
 
 
 @app.get("/healthz", tags=["ops"])
@@ -109,6 +114,24 @@ async def readyz() -> dict[str, object]:
             "ok": bool(settings.gemini_api_key),
             "requirement": "DEP-001",
             "detail": None if settings.gemini_api_key else "GEMINI_API_KEY is not set",
+        },
+        "support_email": {
+            "ok": settings.support_email != "support@example.com" or not settings.is_production,
+            "requirement": "FR-ONB-003",
+            "detail": (
+                None
+                if settings.support_email != "support@example.com"
+                else "SUPPORT_EMAIL is still the placeholder; users and the privacy policy show it"
+            ),
+        },
+        "account_deletion": {
+            "ok": bool(settings.supabase_service_role_key) or not settings.is_production,
+            "requirement": "DR-002",
+            "detail": (
+                None
+                if settings.supabase_service_role_key
+                else "SUPABASE_SERVICE_ROLE_KEY not set; deleting an account leaves the sign-in"
+            ),
         },
         "provider_retention_disabled": {
             "ok": settings.provider_retention_disabled,

@@ -48,7 +48,7 @@ from typing import Final
 
 
 # Condition names, matched whole-word. Lowercase; matching is case-insensitive.
-CONDITION_TERMS: Final[frozenset[str]] = frozenset(
+CONDITION_NAMES: Final[frozenset[str]] = frozenset(
     {
         # Inflammatory and papulosquamous
         "acne",
@@ -70,6 +70,14 @@ CONDITION_TERMS: Final[frozenset[str]] = frozenset(
         "hyperpigmentation",
         "hypopigmentation",
         "albinism",
+        "lentigo",
+        "lentigines",
+        # Follicular and adnexal
+        "hidradenitis",
+        "suppurativa",
+        "malassezia",
+        "pityriasis",
+        "milia",
         # Neoplastic -- the highest-consequence group in the list
         "cancer",
         "cancerous",
@@ -114,13 +122,23 @@ CONDITION_TERMS: Final[frozenset[str]] = frozenset(
         "vasculitis",
         "sarcoidosis",
         "alopecia",
-        # Generic clinical framing. "Lesion" and "cyst" are clinical vocabulary
-        # rather than descriptions a reader can check against the photograph,
-        # which is the line FR-AI-005 draws.
-        "lesion",
-        "lesions",
         "cyst",
         "cystic",
+    }
+)
+
+
+# Clinical framing. Not names, but vocabulary that has stopped describing and
+# started classifying. "Lesion" is not something a reader can check against the
+# photograph, which is the line FR-AI-005 draws for observations.
+#
+# Kept separate from CONDITION_NAMES because some text is REQUIRED to use these
+# words: FR-TRI-005 makes the consultation summary state that it is "not a
+# diagnosis". That text is checked for names only.
+CLINICAL_FRAMING: Final[frozenset[str]] = frozenset(
+    {
+        "lesion",
+        "lesions",
         "pathology",
         "pathological",
         "syndrome",
@@ -136,6 +154,8 @@ CONDITION_TERMS: Final[frozenset[str]] = frozenset(
         "prognosis",
     }
 )
+
+CONDITION_TERMS: Final[frozenset[str]] = CONDITION_NAMES | CLINICAL_FRAMING
 
 
 # Hedges, matched as phrases. A sentence containing one of these has stopped
@@ -172,6 +192,11 @@ _CONDITION_PATTERN: Final[re.Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 
+_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"\b(" + "|".join(sorted(re.escape(t) for t in CONDITION_NAMES)) + r")\b",
+    re.IGNORECASE,
+)
+
 _HEDGE_PATTERN: Final[re.Pattern[str]] = re.compile(
     "(" + "|".join(sorted(re.escape(p) for p in HEDGE_PHRASES)) + ")",
     re.IGNORECASE,
@@ -198,3 +223,16 @@ def find_prohibited(text: str) -> list[str]:
 def is_clean(text: str) -> bool:
     """True when `text` may be stored and displayed as written."""
     return not find_prohibited(text)
+
+
+def find_condition_names(text: str) -> list[str]:
+    """
+    Condition names only -- no framing words, no hedges.
+
+    For text the SRS requires to talk *about* diagnosis without naming one: the
+    FR-TRI-005 summary must say it is "not a diagnosis" and must contain no
+    condition name, and only the second half is a prohibition.
+    """
+    if not text:
+        return []
+    return sorted({m.group(0).lower() for m in _NAME_PATTERN.finditer(text)})

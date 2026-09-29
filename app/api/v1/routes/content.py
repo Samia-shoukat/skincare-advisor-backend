@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import SessionDep, SettingsDep
+from app.api.deps import MatrixStoreDep, SessionDep, SettingsDep
 from app.clinical.copy import strings
 from app.db.models.review import resolve_review_claim
 from app.services.questionnaire import get_questionnaire
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/content", tags=["content"])
 
 
 @router.get("/strings")
-async def get_strings(session: SessionDep, settings: SettingsDep) -> dict:
+async def get_strings(session: SessionDep, store: MatrixStoreDep, settings: SettingsDep) -> dict:
     """
     The full claim bundle, with one version stamp over all of it.
 
@@ -38,8 +38,13 @@ async def get_strings(session: SessionDep, settings: SettingsDep) -> dict:
     stamp rather than one per string is deliberate: these strings are reviewed
     together, and a mix of versions on one screen would defeat the review.
     """
-    claim = await resolve_review_claim(session, settings.active_matrix_version)
-    return strings.bundle(review_claim=str(claim["claim"]))
+    # FR-ONB-008: the claim binds to the matrix version actually in force.
+    claim = await resolve_review_claim(session, (await store.get()).matrix.version)
+    return strings.bundle(
+        review_claim=str(claim["claim"]),
+        consent_version=settings.consent_statement_version,
+        support_email=settings.support_email,
+    )
 
 
 @router.get("/questionnaire")
@@ -56,11 +61,11 @@ async def get_skin_type_questionnaire(settings: SettingsDep) -> dict:
 
 
 @router.get("/review-claim")
-async def get_review_claim(session: SessionDep, settings: SettingsDep) -> dict:
+async def get_review_claim(session: SessionDep, store: MatrixStoreDep) -> dict:
     """
     FR-ONB-008.
 
     Returns `substantiated: false` and no reviewer block unless a signed record
     exists for the active matrix version. Clients branch on `substantiated`.
     """
-    return await resolve_review_claim(session, settings.active_matrix_version)
+    return await resolve_review_claim(session, (await store.get()).matrix.version)

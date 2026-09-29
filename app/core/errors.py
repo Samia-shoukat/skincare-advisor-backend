@@ -146,6 +146,49 @@ class ScanAccessBlocked(AppError):
 # ---------------------------------------------------------------------------
 
 
+class ReferralRequired(AppError):
+    """
+    FR-TRI-001. The user's own answers call for an in-person assessment.
+
+    Its own code rather than a reuse of ONBOARDING_INCOMPLETE, because the
+    client does something different with each: one sends the user back to
+    setup, the other shows the referral screen and summary.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "REFERRAL_REQUIRED"
+    message = "Please see a healthcare professional before scanning."
+
+
+class AccountDeletionFailed(AppError):
+    """
+    DR-002. The sign-in could not be removed, so nothing was deleted.
+
+    All-or-nothing on purpose: deleting the data but leaving a working login
+    is a half-deleted account the user cannot see or finish deleting.
+    """
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "ACCOUNT_DELETION_FAILED"
+    message = "We couldn't delete your account just now. Nothing was removed. Please try again."
+
+
+class NoRoutine(AppError):
+    """GET /v1/routines/latest before any scan has produced a routine."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "NO_ROUTINE"
+    message = "You don't have a routine yet."
+
+
+class NotReferred(AppError):
+    """GET /v1/scans/referral for a user with no referral condition."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "NOT_REFERRED"
+    message = "There is no referral for this account."
+
+
 class QuotaExceeded(AppError):
     status_code = status.HTTP_403_FORBIDDEN
     code = ErrorCode.QUOTA_EXCEEDED.value

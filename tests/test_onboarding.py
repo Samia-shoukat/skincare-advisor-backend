@@ -495,7 +495,8 @@ async def test_limitations_statement_is_served_from_the_string_resource(client):
     body = response.json()
     statement = body["limitationsStatement"]
 
-    assert body["version"] == TEST_CONSENT_VERSION
+    # The consent version is its own field, separate from the bundle version.
+    assert body["consentVersion"] == TEST_CONSENT_VERSION
     assert "not a medical device" in statement
     assert "cannot diagnose" in statement
 

@@ -24,6 +24,7 @@ not zero-save.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -44,6 +45,10 @@ from app.services.analysis.base import (
 logger = logging.getLogger(__name__)
 
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+# Temporary provider errors worth one or two more tries, and the waits between.
+_TRANSIENT = frozenset({429, 500, 503})
+_RETRY_DELAYS: tuple[float, ...] = (1.0, 2.0)
 
 
 # The response contract, restated to the provider. The Pydantic schema is the
@@ -74,6 +79,36 @@ Set "imageUsable" to false if the face is not clearly visible, the image is too
 dark or blurred to assess, or the frame is obstructed."""
 
 
+# What a clinical signal is NOT.
+#
+# Added after live testing, where three scans in a row were referred for
+# "darker skin around the eyes". Dark circles fit "an area darker than the
+# surrounding skin" exactly, and nearly everyone has them -- so nearly every
+# user was told to see a doctor and never saw a routine. A screening layer that
+# fires on almost everyone is not a safety feature: it is noise that trains
+# people to ignore the one referral that mattered.
+#
+# The exclusions below are ordinary cosmetic or normal findings, and the SRS
+# already has somewhere to put them (UNEVEN_TONE, POST_ACNE_MARKS). This
+# narrows what is screened; it does not change what happens when something IS
+# found. NEEDS CLINICAL REVIEW (OI-010): a practitioner should confirm that
+# nothing worth referring hides in this list -- periorbital darkening can, more
+# rarely, accompany conditions this app does not attempt to detect.
+_NOT_CLINICAL_SIGNALS = (
+    "\nDo NOT report any of the following as clinicalSignals. They are ordinary "
+    "cosmetic characteristics or normal variation, and reporting them sends "
+    "someone to a doctor for nothing:\n"
+    "- shadowing or darker skin around, under, or on the eyelids (dark circles), "
+    "however dark, and including when both eyes are affected\n"
+    "- flat marks left where a blemish has healed\n"
+    "- freckles, ordinary moles, or generally uneven skin tone\n"
+    "- darkening or redness only where a spot or blemish is\n"
+    "- shadows cast by lighting, hair, or the angle of the photograph\n"
+    "Report these as cosmeticConcerns where they fit (UNEVEN_TONE, "
+    "POST_ACNE_MARKS), or not at all.\n\n"
+)
+
+
 _TASK_PROMPTS: dict[AnalysisTask, str] = {
     # OBJ-002 asks for a single analysis call per scan. This prompt carries
     # both halves of Appendix G so that one call answers both questions; the
@@ -88,7 +123,8 @@ _TASK_PROMPTS: dict[AnalysisTask, str] = {
         "pore openings visibly enlarged? Is there mild diffuse pinkness? Are "
         "there fine surface lines?\n\n"
         "Second, and separately, report any of the following if visible:\n"
-        "- areas visibly darker than the surrounding skin, and where\n"
+        "- a discrete patch clearly darker than the skin around it, with a "
+        "defined edge, in one place rather than mirrored on both sides\n"
         "- raised inflamed areas with a defined edge\n"
         "- areas with visible scale or flaking over a raised patch\n"
         "- redness covering a broad area rather than isolated spots\n"
@@ -98,7 +134,8 @@ _TASK_PROMPTS: dict[AnalysisTask, str] = {
         "- broken skin\n"
         "- crusting, oozing, or a visible yellow film\n"
         "- a mark with an uneven edge or more than one colour\n\n"
-        "Report the first group as cosmeticConcerns and the second as "
+        + _NOT_CLINICAL_SIGNALS
+        + "Report the first group as cosmeticConcerns and the second as "
         "clinicalSignals. Describe appearance and location only. Do not "
         "interpret and do not name a condition.\n\n" + _SCHEMA_INSTRUCTION
     ),
@@ -121,7 +158,8 @@ _TASK_PROMPTS: dict[AnalysisTask, str] = {
     ),
     AnalysisTask.CLINICAL_SIGNAL_SCREENING: (
         "Describe any of the following if visible in this photograph:\n"
-        "- areas visibly darker than the surrounding skin, and where\n"
+        "- a discrete patch clearly darker than the skin around it, with a "
+        "defined edge, in one place rather than mirrored on both sides\n"
         "- raised inflamed areas with a defined edge\n"
         "- areas with visible scale or flaking over a raised patch\n"
         "- redness covering a broad area rather than isolated spots\n"
@@ -131,7 +169,8 @@ _TASK_PROMPTS: dict[AnalysisTask, str] = {
         "- broken skin\n"
         "- crusting, oozing, or a visible yellow film\n"
         "- a mark with an uneven edge or more than one colour\n\n"
-        "Describe appearance and location only. Do not interpret. Do not name a "
+        + _NOT_CLINICAL_SIGNALS
+        + "Describe appearance and location only. Do not interpret. Do not name a "
         "condition. Report these as clinicalSignals and return cosmeticConcerns "
         "as an empty array.\n\n" + _SCHEMA_INSTRUCTION
     ),
@@ -184,19 +223,43 @@ class GeminiProvider(AnalysisProvider):
             },
         }
 
-        try:
-            response = await self._client.post(
-                _ENDPOINT.format(model=self._model),
-                headers={"x-goog-api-key": self._settings.gemini_api_key},
-                json=body,
-            )
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            # Logged without the request body: that body holds the base64
-            # image, and a stack trace carrying a face photograph into a log
-            # file is exactly what FR-CAM-004 exists to prevent.
-            logger.warning("vision provider call failed: %s", type(exc).__name__)
-            raise ProviderUnavailable(type(exc).__name__) from None
+        # Google answers 503 (overloaded) or 429 (rate limited) under load, and
+        # the same request usually succeeds a second later. Retried briefly so
+        # a user is not failed for a momentary blip; anything else -- a 400, a
+        # 404 for a retired model -- fails at once, because retrying cannot fix
+        # it. Worst case adds ~3s against the 30s client timeout.
+        response = None
+        for attempt, delay in enumerate(_RETRY_DELAYS + (None,)):
+            try:
+                response = await self._client.post(
+                    _ENDPOINT.format(model=self._model),
+                    headers={"x-goog-api-key": self._settings.gemini_api_key},
+                    json=body,
+                )
+                if response.status_code in _TRANSIENT and delay is not None:
+                    logger.info(
+                        "vision provider returned %d, retrying (attempt %d)",
+                        response.status_code,
+                        attempt + 1,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                response.raise_for_status()
+                break
+            except httpx.HTTPStatusError as exc:
+                # Logged without the request body: that body holds the base64
+                # image, and a stack trace carrying a face photograph into a
+                # log file is exactly what FR-CAM-004 exists to prevent.
+                logger.warning(
+                    "vision provider call failed: HTTP %d", exc.response.status_code
+                )
+                raise ProviderUnavailable(f"HTTP {exc.response.status_code}") from None
+            except httpx.HTTPError as exc:
+                if delay is not None:
+                    await asyncio.sleep(delay)
+                    continue
+                logger.warning("vision provider call failed: %s", type(exc).__name__)
+                raise ProviderUnavailable(type(exc).__name__) from None
 
         raw = self._extract_json(response.json())
         parsed, discards = parse_provider_response(raw)

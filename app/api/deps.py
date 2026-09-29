@@ -21,6 +21,10 @@ from app.core.errors import ScanAccessBlocked, Unauthorised
 from app.core.security import TokenClaims, verify_token
 from app.db.models.user import User
 from app.db.session import get_session
+from app.services.auth_admin import AuthAdmin
+from app.services.matrix_loader import MatrixStore
+from app.services.routine_service import RoutineService
+from app.services.scan_pipeline import ScanPipeline
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -87,6 +91,64 @@ async def get_scannable_user(user: CurrentUser) -> User:
 
 
 ScannableUser = Annotated[User, Depends(get_scannable_user)]
+
+
+_matrix_store: MatrixStore | None = None
+_pipeline: ScanPipeline | None = None
+
+
+def get_matrix_store(settings: SettingsDep) -> MatrixStore:
+    """
+    One matrix store per process, shared by the pipeline and the content
+    routes, so the review claim (FR-ONB-008) and the routines (FR-REC-006)
+    always refer to the same matrix version.
+    """
+    global _matrix_store
+    if _matrix_store is None:
+        _matrix_store = MatrixStore(settings)
+    return _matrix_store
+
+
+MatrixStoreDep = Annotated[MatrixStore, Depends(get_matrix_store)]
+
+
+def get_scan_pipeline(settings: SettingsDep, store: MatrixStoreDep) -> ScanPipeline:
+    """
+    The scan pipeline, built once per process.
+
+    Once rather than per request because the hosted provider holds an HTTP
+    client, and a fresh connection pool per scan would pay a TLS handshake to
+    the provider every time. A dependency rather than a module global so that
+    tests replace it through `dependency_overrides` with a stub provider,
+    instead of patching the network.
+    """
+    global _pipeline
+    if _pipeline is None:
+        from app.services.analysis.gemini import GeminiProvider
+        from app.services.analysis.router import AnalysisRouter
+
+        router = AnalysisRouter(settings, hosted=GeminiProvider(settings))
+        _pipeline = ScanPipeline(settings, router, routines=RoutineService(store))
+    return _pipeline
+
+
+async def close_scan_pipeline() -> None:
+    """Called at shutdown so the provider's connection pool is released."""
+    global _pipeline
+    if _pipeline is not None:
+        await _pipeline.aclose()
+        _pipeline = None
+
+
+PipelineDep = Annotated[ScanPipeline, Depends(get_scan_pipeline)]
+
+
+def get_auth_admin(settings: SettingsDep) -> AuthAdmin:
+    """Supabase Admin API, for deleting sign-ins. Overridden in tests."""
+    return AuthAdmin(settings)
+
+
+AuthAdminDep = Annotated[AuthAdmin, Depends(get_auth_admin)]
 
 
 async def find_user(session: AsyncSession, auth_id: str) -> User | None:

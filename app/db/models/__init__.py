@@ -8,8 +8,19 @@ a table Alembic will silently never create.
 """
 
 from app.db.base import Base
+from app.db.models.catalogue import Product
 from app.db.models.review import ReviewRecord
+from app.db.models.routine import Routine, routine_products
 from app.db.models.scan_log import ScanLog
 from app.db.models.user import SafetyAnswerChange, User
 
-__all__ = ["Base", "ReviewRecord", "ScanLog", "SafetyAnswerChange", "User"]
+__all__ = [
+    "Base",
+    "Product",
+    "ReviewRecord",
+    "Routine",
+    "SafetyAnswerChange",
+    "ScanLog",
+    "User",
+    "routine_products",
+]
