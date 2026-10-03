@@ -1,0 +1,78 @@
+# Render blueprint for the Skincare Advisor backend.
+#
+# Render reads this when you create a Blueprint from the repository. It defines
+# the service; it does NOT carry any secret. Every value marked `sync: false`
+# has to be typed into Render's dashboard once, because committing a database
+# password or an API key to a repository is how they leak.
+#
+# ## Why the migration runs in the build
+#
+# `preDeployCommand` is the right place for it, but that field is only available
+# on paid instance types. On the free type the build command is the last hook
+# that runs before the new version starts, so `alembic upgrade head` goes there.
+# The consequence is that a failed migration fails the build rather than the
+# deploy, which is the same outcome from the outside: the old version keeps
+# serving.
+#
+# ## The free instance sleeps
+#
+# A free service spins down after about fifteen minutes with no traffic, and the
+# next request pays roughly a minute of cold start. A scan arriving on a cold
+# instance can exceed the app's own request timeout and surface as a failed
+# scan. For demonstrating the project that is usually acceptable; for anything
+# being marked or watched live, move to a paid instance or send a request a few
+# minutes beforehand to wake it.
+
+services:
+  - type: web
+    name: skincare-advisor-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # FastAPI already exposes this; Render polls it to decide a deploy is live.
+    healthCheckPath: /healthz
+
+    envVars:
+      # Pinned to the version the project was developed and tested against.
+      - key: PYTHON_VERSION
+        value: 3.13.3
+
+      # Non-secret configuration. Safe in the repository.
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: CONSENT_STATEMENT_VERSION
+        value: "1.2"
+      - key: SUPPORT_EMAIL
+        value: samiashoukat004@gmail.com
+      - key: OPERATOR_NAME
+        value: AI Skincare Advisor project team
+
+      # FR-SUB-004. Must be true in production: with it off, every account gets
+      # unlimited scans and the app logs an error on startup saying so.
+      - key: QUOTA_ENFORCED
+        value: "true"
+      - key: DEFAULT_SCAN_ALLOWANCE
+        value: "1"
+
+      # CON-005. Tells the provider not to retain submitted images.
+      - key: PROVIDER_RETENTION_DISABLED
+        value: "true"
+
+      # Secrets. Entered in the Render dashboard, never here.
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
