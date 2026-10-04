@@ -1,7 +1,7 @@
 
 ---
 
-## `README.md` — poori replace karein
+## `README.md` 
 
 ```markdown
 # Skincare Advisor
