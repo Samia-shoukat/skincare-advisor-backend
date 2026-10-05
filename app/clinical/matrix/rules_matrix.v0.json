@@ -4,15 +4,22 @@
     "Appendix F: the clinical rules matrix. Closes OI-002 as a first draft.",
     "All clinical logic lives in this file (CON-003). The engine only interprets it.",
     "Nothing here has been reviewed by a practitioner (OI-001, DEP-003), so no rule",
-    "is expert_confirmed and the app makes no review claim (FR-ONB-008)."
+    "is expert_confirmed and the app makes no review claim (FR-ONB-008).",
+    "",
+    "AZELAIC ACID CONCENTRATION (corrected 2026-10-05).",
+    "R-RED-01, R-ACN-03 and R-PAM-01 were marked guideline_sourced at 10%.",
+    "The v0.4 provenance audit found no guideline support for 10%: NICE NG198",
+    "defines topical azelaic acid as 15% or 20%, and the AAD 2024 evidence rests",
+    "on 20% cream. The 10% figure is the common OTC strength, not an evidenced",
+    "one. The claim was wrong, so these rules are now needs_review.",
+    "The concentration itself is unchanged: moving 10% to 15% or 20% is a",
+    "clinical decision and waits on the dermatologist review (OI-001)."
   ],
-
   "limits": {
     "maxActivesAm": 1,
     "maxActivesPm": 1,
     "_note": "FR-REC-004 invariant 6. One active per time of day is the conservative starting point for a first routine; layering actives is where irritation comes from."
   },
-
   "ingredients": {
     "gentle_cleanser": {
       "label": "Gentle, fragrance-free cleanser",
@@ -61,43 +68,58 @@
       "isActiveIngredient": true,
       "minorRestricted": false,
       "pregnancyRestricted": true,
-      "incompatibleWith": ["adapalene", "glycolic_acid"]
+      "incompatibleWith": [
+        "adapalene",
+        "glycolic_acid"
+      ]
     },
     "benzoyl_peroxide": {
       "label": "Benzoyl peroxide",
       "isActiveIngredient": true,
       "minorRestricted": false,
       "pregnancyRestricted": false,
-      "incompatibleWith": ["vitamin_c"]
+      "incompatibleWith": [
+        "vitamin_c"
+      ]
     },
     "adapalene": {
       "label": "Adapalene gel (retinoid)",
       "isActiveIngredient": true,
       "minorRestricted": false,
       "pregnancyRestricted": true,
-      "incompatibleWith": ["salicylic_acid", "glycolic_acid"]
+      "incompatibleWith": [
+        "salicylic_acid",
+        "glycolic_acid"
+      ]
     },
     "glycolic_acid": {
       "label": "Glycolic acid (AHA)",
       "isActiveIngredient": true,
       "minorRestricted": true,
       "pregnancyRestricted": false,
-      "incompatibleWith": ["adapalene", "salicylic_acid"]
+      "incompatibleWith": [
+        "adapalene",
+        "salicylic_acid"
+      ]
     },
     "vitamin_c": {
       "label": "Vitamin C serum",
       "isActiveIngredient": true,
       "minorRestricted": false,
       "pregnancyRestricted": false,
-      "incompatibleWith": ["benzoyl_peroxide"]
+      "incompatibleWith": [
+        "benzoyl_peroxide"
+      ]
     }
   },
-
   "baseSteps": [
     {
       "ruleId": "BASE-01",
       "step": "CLEANSE",
-      "timing": ["AM", "PM"],
+      "timing": [
+        "AM",
+        "PM"
+      ],
       "ingredientBySkinType": {
         "OILY": "gentle_cleanser",
         "DRY": "gentle_cleanser",
@@ -111,7 +133,10 @@
     {
       "ruleId": "BASE-02",
       "step": "MOISTURISE",
-      "timing": ["AM", "PM"],
+      "timing": [
+        "AM",
+        "PM"
+      ],
       "ingredientBySkinType": {
         "OILY": "moisturiser_light",
         "DRY": "moisturiser_barrier",
@@ -125,7 +150,9 @@
     {
       "ruleId": "BASE-03",
       "step": "PROTECT",
-      "timing": ["AM"],
+      "timing": [
+        "AM"
+      ],
       "ingredientBySkinType": {
         "OILY": "sunscreen_spf30",
         "DRY": "sunscreen_spf30",
@@ -137,50 +164,272 @@
       "reviewStatus": "guideline_sourced"
     }
   ],
-
   "concerns": {
-    "DRYNESS":         { "priority": 1, "prohibits": ["glycolic_acid", "salicylic_acid", "benzoyl_peroxide", "adapalene"] },
-    "DEHYDRATION":     { "priority": 1, "prohibits": ["glycolic_acid", "salicylic_acid", "benzoyl_peroxide", "adapalene"] },
-    "MILD_REDNESS":    { "priority": 1, "prohibits": ["glycolic_acid", "salicylic_acid", "benzoyl_peroxide", "adapalene", "vitamin_c"] },
-    "ACNE":            { "priority": 2, "prohibits": [] },
-    "EXCESS_OIL":      { "priority": 3, "prohibits": [] },
-    "ENLARGED_PORES":  { "priority": 3, "prohibits": [] },
-    "POST_ACNE_MARKS": { "priority": 3, "prohibits": [] },
-    "UNEVEN_TONE":     { "priority": 3, "prohibits": [] },
-    "FINE_LINES":      { "priority": 4, "prohibits": [] }
+    "DRYNESS": {
+      "priority": 1,
+      "prohibits": [
+        "glycolic_acid",
+        "salicylic_acid",
+        "benzoyl_peroxide",
+        "adapalene"
+      ]
+    },
+    "DEHYDRATION": {
+      "priority": 1,
+      "prohibits": [
+        "glycolic_acid",
+        "salicylic_acid",
+        "benzoyl_peroxide",
+        "adapalene"
+      ]
+    },
+    "MILD_REDNESS": {
+      "priority": 1,
+      "prohibits": [
+        "glycolic_acid",
+        "salicylic_acid",
+        "benzoyl_peroxide",
+        "adapalene",
+        "vitamin_c"
+      ]
+    },
+    "ACNE": {
+      "priority": 2,
+      "prohibits": []
+    },
+    "EXCESS_OIL": {
+      "priority": 3,
+      "prohibits": []
+    },
+    "ENLARGED_PORES": {
+      "priority": 3,
+      "prohibits": []
+    },
+    "POST_ACNE_MARKS": {
+      "priority": 3,
+      "prohibits": []
+    },
+    "UNEVEN_TONE": {
+      "priority": 3,
+      "prohibits": []
+    },
+    "FINE_LINES": {
+      "priority": 4,
+      "prohibits": []
+    }
   },
-
   "prescriptionExclusions": {
-    "ingredients": ["adapalene", "benzoyl_peroxide", "salicylic_acid", "glycolic_acid", "azelaic_acid"],
+    "ingredients": [
+      "adapalene",
+      "benzoyl_peroxide",
+      "salicylic_acid",
+      "glycolic_acid",
+      "azelaic_acid"
+    ],
     "source": "REF-002",
     "reviewStatus": "needs_review",
     "_note": "A user already on a prescription acne treatment gets no OTC acne active on top of it. Doubling actives is the commonest cause of irritation."
   },
-
   "rules": [
-    { "ruleId": "R-DRY-01",   "concern": "DRYNESS",         "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-DEH-01",   "concern": "DEHYDRATION",     "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-RED-01",   "concern": "MILD_REDNESS",    "ingredient": "azelaic_acid",    "maxPercent": 10,  "timing": "PM", "frequency": "DAILY",       "source": "REF-002", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-RED-02",   "concern": "MILD_REDNESS",    "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-
-    { "ruleId": "R-ACN-01",   "concern": "ACNE",            "ingredient": "adapalene",       "maxPercent": 0.1, "timing": "PM", "frequency": "ALTERNATE_DAYS", "source": "REF-001; REF-002", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-ACN-02",   "concern": "ACNE",            "ingredient": "benzoyl_peroxide","maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001; REF-002", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-ACN-03",   "concern": "ACNE",            "ingredient": "azelaic_acid",    "maxPercent": 10,  "timing": "PM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-ACN-04",   "concern": "ACNE",            "ingredient": "salicylic_acid",  "maxPercent": 2,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-ACN-05",   "concern": "ACNE",            "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-
-    { "ruleId": "R-OIL-01",   "concern": "EXCESS_OIL",      "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-OIL-02",   "concern": "EXCESS_OIL",      "ingredient": "salicylic_acid",  "maxPercent": 2,   "timing": "PM", "frequency": "ALTERNATE_DAYS", "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-POR-01",   "concern": "ENLARGED_PORES",  "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-POR-02",   "concern": "ENLARGED_PORES",  "ingredient": "salicylic_acid",  "maxPercent": 2,   "timing": "PM", "frequency": "ALTERNATE_DAYS", "source": "REF-001", "reviewStatus": "needs_review" },
-
-    { "ruleId": "R-PAM-01",   "concern": "POST_ACNE_MARKS", "ingredient": "azelaic_acid",    "maxPercent": 10,  "timing": "PM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "guideline_sourced" },
-    { "ruleId": "R-PAM-02",   "concern": "POST_ACNE_MARKS", "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-UNT-01",   "concern": "UNEVEN_TONE",     "ingredient": "vitamin_c",       "maxPercent": 15,  "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-UNT-02",   "concern": "UNEVEN_TONE",     "ingredient": "azelaic_acid",    "maxPercent": 10,  "timing": "PM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" },
-
-    { "ruleId": "R-FIN-01",   "concern": "FINE_LINES",      "ingredient": "adapalene",       "maxPercent": 0.1, "timing": "PM", "frequency": "ALTERNATE_DAYS", "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-FIN-02",   "concern": "FINE_LINES",      "ingredient": "glycolic_acid",   "maxPercent": 8,   "timing": "PM", "frequency": "TWICE_WEEKLY", "source": "REF-001", "reviewStatus": "needs_review" },
-    { "ruleId": "R-FIN-03",   "concern": "FINE_LINES",      "ingredient": "niacinamide",     "maxPercent": 5,   "timing": "AM", "frequency": "DAILY",       "source": "REF-001", "reviewStatus": "needs_review" }
+    {
+      "ruleId": "R-DRY-01",
+      "concern": "DRYNESS",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-DEH-01",
+      "concern": "DEHYDRATION",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-RED-01",
+      "concern": "MILD_REDNESS",
+      "ingredient": "azelaic_acid",
+      "maxPercent": 10,
+      "timing": "PM",
+      "frequency": "DAILY",
+      "source": "REF-002",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-RED-02",
+      "concern": "MILD_REDNESS",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-ACN-01",
+      "concern": "ACNE",
+      "ingredient": "adapalene",
+      "maxPercent": 0.1,
+      "timing": "PM",
+      "frequency": "ALTERNATE_DAYS",
+      "source": "REF-001; REF-002",
+      "reviewStatus": "guideline_sourced"
+    },
+    {
+      "ruleId": "R-ACN-02",
+      "concern": "ACNE",
+      "ingredient": "benzoyl_peroxide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001; REF-002",
+      "reviewStatus": "guideline_sourced"
+    },
+    {
+      "ruleId": "R-ACN-03",
+      "concern": "ACNE",
+      "ingredient": "azelaic_acid",
+      "maxPercent": 10,
+      "timing": "PM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-ACN-04",
+      "concern": "ACNE",
+      "ingredient": "salicylic_acid",
+      "maxPercent": 2,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "guideline_sourced"
+    },
+    {
+      "ruleId": "R-ACN-05",
+      "concern": "ACNE",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-OIL-01",
+      "concern": "EXCESS_OIL",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-OIL-02",
+      "concern": "EXCESS_OIL",
+      "ingredient": "salicylic_acid",
+      "maxPercent": 2,
+      "timing": "PM",
+      "frequency": "ALTERNATE_DAYS",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-POR-01",
+      "concern": "ENLARGED_PORES",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-POR-02",
+      "concern": "ENLARGED_PORES",
+      "ingredient": "salicylic_acid",
+      "maxPercent": 2,
+      "timing": "PM",
+      "frequency": "ALTERNATE_DAYS",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-PAM-01",
+      "concern": "POST_ACNE_MARKS",
+      "ingredient": "azelaic_acid",
+      "maxPercent": 10,
+      "timing": "PM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-PAM-02",
+      "concern": "POST_ACNE_MARKS",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-UNT-01",
+      "concern": "UNEVEN_TONE",
+      "ingredient": "vitamin_c",
+      "maxPercent": 15,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-UNT-02",
+      "concern": "UNEVEN_TONE",
+      "ingredient": "azelaic_acid",
+      "maxPercent": 10,
+      "timing": "PM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-FIN-01",
+      "concern": "FINE_LINES",
+      "ingredient": "adapalene",
+      "maxPercent": 0.1,
+      "timing": "PM",
+      "frequency": "ALTERNATE_DAYS",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-FIN-02",
+      "concern": "FINE_LINES",
+      "ingredient": "glycolic_acid",
+      "maxPercent": 8,
+      "timing": "PM",
+      "frequency": "TWICE_WEEKLY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    },
+    {
+      "ruleId": "R-FIN-03",
+      "concern": "FINE_LINES",
+      "ingredient": "niacinamide",
+      "maxPercent": 5,
+      "timing": "AM",
+      "frequency": "DAILY",
+      "source": "REF-001",
+      "reviewStatus": "needs_review"
+    }
   ]
 }

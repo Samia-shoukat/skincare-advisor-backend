@@ -4,3 +4,4 @@ __pycache__/
 # Postman environment holds live test tokens
 postman/local.postman_environment.json
 postman/grey-test-image.png
+*.bak 

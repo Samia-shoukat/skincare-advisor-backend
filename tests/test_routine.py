@@ -140,18 +140,52 @@ async def test_product_above_the_rule_strength_is_never_shown(session_factory):
     options = step_for(payload, "niacinamide")["products"]
     shown = {options["budget"]["id"], options["premium"]["id"]}
 
-    assert "the-ordinary-niacinamide-10-zinc" not in shown  # 10%
-    assert "lrp-pure-niacinamide-10" not in shown  # 10%
-    assert options["budget"]["id"] == "minimalist-niacinamide-5"  # 5%
-    assert options["premium"]["id"] == "beauty-of-joseon-glow-serum"  # 2%
+    # The Ordinary's 10% serum is in the catalogue and is the best known
+    # niacinamide product sold here. It is still never shown, because 10% is
+    # above every niacinamide rule in the matrix.
+    assert "the-ordinary-niacinamide-10-zinc-1" not in shown
+    # What is shown states no strength on the pack, so there is nothing to
+    # breach -- the cap check applies only where both numbers are known.
+    assert options["budget"]["id"] == "ponds-bright-beauty-spotless-glow-cream"
+    assert options["premium"]["id"] == "cetaphil-bright-healthy-radiance-night-cream"
 
 
 async def test_product_with_a_second_active_is_never_shown(session_factory):
-    """The premium vitamin C also contains salicylic acid."""
-    payload, _ = await _match(session_factory, make(Concern.UNEVEN_TONE))
+    """
+    A bottle carrying two matrix actives is rejected, because showing it would
+    add an active the engine did not choose and break the FR-REC-004 count.
+
+    The product is inserted here rather than taken from the catalogue: the
+    Pakistan catalogue deliberately contains only single-active products, so
+    there is nothing in it that exercises this filter. Owning the fixture also
+    means the test keeps testing the rule when the catalogue is next replaced.
+    """
+    await seed(session_factory)
+    async with session_factory() as db:
+        db.add(
+            Product(
+                id="test-two-active-vitamin-c",
+                brand="Test",
+                name="Vitamin C with salicylic acid",
+                price_tier=ProductTier.PREMIUM,
+                ingredients=[
+                    {"ingredient": "vitamin_c", "percent": 10},
+                    {"ingredient": "salicylic_acid", "percent": 2},
+                ],
+                is_active=True,
+                catalogue_version="test",
+            )
+        )
+        await db.commit()
+
+    data = make(Concern.UNEVEN_TONE)
+    routine = generate_routine(MATRIX, data)
+    async with session_factory() as db:
+        payload, _ = await match_products(db, MATRIX, data, routine)
+
     options = step_for(payload, "vitamin_c")["products"]
-    assert options["premium"] is None
-    assert options["budget"]["id"] == "the-ordinary-ascorbyl-glucoside-12"
+    shown = {o["id"] for o in (options["budget"], options["premium"]) if o}
+    assert "test-two-active-vitamin-c" not in shown
 
 
 async def test_no_product_contains_an_excluded_ingredient(session_factory):
@@ -180,7 +214,7 @@ async def test_no_product_contains_an_excluded_ingredient(session_factory):
 async def test_inactive_product_is_never_shown(session_factory):
     await seed(session_factory)
     async with session_factory() as db:
-        (await db.get(Product, "benzac-ac-5")).is_active = False
+        (await db.get(Product, "benzique-cream-4")).is_active = False
         await db.commit()
     data = make(Concern.ACNE, pregnant=True)  # pregnancy moves acne to benzoyl peroxide
     routine = generate_routine(MATRIX, data)
