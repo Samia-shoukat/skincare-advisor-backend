@@ -309,3 +309,42 @@ detect, and excluding it by name means such a case reaches a routine instead of
 a referral. FR-ONB-005's declared answers remain the layer that catches what
 the image misses. **A practitioner must confirm this exclusion list before
 release** (OI-010 covers exactly this: screening reliability is unmeasured).
+
+---
+
+### ADR-028 — The trained skin model is registered for ACNE_DETECTION, gated off
+**FR-AI-004, FR-AI-009, FR-AI-010, NFR-SAFE-008, CON-004** · Accepted
+
+The first Colab-trained model (ViT-base on SCIN, exported to ONNX) is wired in
+as the internal inference service ADR-015 left room for:
+`app/services/analysis/onnx_skin.py`, registered with the router in
+`app/api/deps.py`.
+
+It serves **ACNE_DETECTION only**. It predicts acne / dark spots / redness /
+normal; COMBINED and CLINICAL_SIGNAL_SCREENING need clinical signals it never
+learned, and COSMETIC_CONCERNS needs nine concerns, not three. It detects
+presence, not extent, so every finding is graded MILD rather than inventing a
+severity from the model's confidence.
+
+The FR-AI-010 gate is code, not a checklist: `evaluate_gate` reads the
+evaluation recorded in `labels.json` and the provider declines every task
+unless it passes -- macro-F1, the served class's F1, accuracy for each
+Fitzpatrick group with enough photos to measure it, the gap between groups,
+the ONNX export check, and for the int8 file its own recorded agreement with
+the full model. The router then falls back to the hosted provider and records
+the reason.
+
+The first run fails the gate on five counts (macro-F1 0.52; skin tone V-VI at
+40% on 15 photos; a 39-point tone gap; III-IV at 61%; int8 never evaluated),
+so release behaviour is unchanged: hosted-only, as ADR-015 decided.
+
+*Also added:* `ml/vision/detect_skin_issue.py` and a development endpoint,
+`POST /v1/dev/skin-model/predict`, both on the same `SkinIssueModel`. The
+endpoint answers 404 unless `SKIN_MODEL_DEBUG_ENDPOINT=true`, and always in
+production. Inference libraries are in `requirements-model.txt`, not
+`requirements.txt`: the API starts without them, and a missing library
+disables the model, never the scan endpoint.
+
+*Cost:* the ONNX files are not in git (87–343 MB). A server that should run
+the model needs its own copy step; none is built, because no model has yet
+earned one.

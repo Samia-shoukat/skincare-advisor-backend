@@ -11,10 +11,13 @@ of what the API actually exposes.
 
 from fastapi import APIRouter
 
-from app.api.v1.routes import content, onboarding, routine, scan
+from app.api.v1.routes import content, onboarding, routine, scan, skin_model
 
 api_router = APIRouter(prefix="/v1")
 api_router.include_router(onboarding.router)
 api_router.include_router(content.router)
 api_router.include_router(scan.router)
 api_router.include_router(routine.router)
+# Development only: answers 404 unless SKIN_MODEL_DEBUG_ENDPOINT is set, and
+# always in production. See routes/skin_model.py.
+api_router.include_router(skin_model.router)

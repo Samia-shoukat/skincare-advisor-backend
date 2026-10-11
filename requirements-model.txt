@@ -1,0 +1,15 @@
+# The internal skin-issue model (app/services/analysis/onnx_skin.py).
+#
+# Separate from requirements.txt on purpose: the model is off unless
+# INTERNAL_MODEL_TASKS names a task, and the API starts without these --
+# a missing library disables the model, never the scan endpoint. Install
+# them where the model will actually run:
+#
+#     pip install -r requirements.txt -r requirements-model.txt
+onnxruntime>=1.20
+# Headless: a server has no display, and the GUI build drags in X11 libraries.
+# <5: OpenCV 5 removed CascadeClassifier and its bundled face models.
+opencv-python-headless>=4.10,<5
+# Resizing must match training's PIL bilinear exactly (see _preprocess).
+pillow>=10
+numpy>=1.26

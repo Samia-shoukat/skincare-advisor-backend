@@ -1,0 +1,5 @@
+This model was trained on images and labels from the Skin Condition Image Network (SCIN)
+dataset by Google, used under the SCIN Data Use License:
+  https://huggingface.co/datasets/google/scin
+Images were selected by label, resized and augmented for training. Re-identifying any
+person pictured in SCIN is prohibited by that licence.

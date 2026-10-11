@@ -213,6 +213,26 @@ class ProviderUnavailableError(AppError):
     message = "The service is temporarily unavailable. Please try again shortly."
 
 
+class DevEndpointDisabled(AppError):
+    """
+    A development-only endpoint, switched off. 404 rather than 403: in
+    production the endpoint should look as if it does not exist, because for
+    every purpose a client has, it does not.
+    """
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "NOT_FOUND"
+    message = "Not found."
+
+
+class SkinModelUnavailable(AppError):
+    """The skin-issue model's files or libraries are not on this server."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "SKIN_MODEL_UNAVAILABLE"
+    message = "The skin model isn't loaded on this server."
+
+
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------

@@ -91,6 +91,30 @@ class Settings(BaseSettings):
     # before its evaluation exists changes the log line, not the behaviour.
     internal_model_tasks: str = ""
 
+    # --- Internal skin-issue model (app/services/analysis/onnx_skin.py) -----
+    # Exported by ml/notebooks/Skin_Issue_Trainer_Colab.ipynb. Loaded only when
+    # INTERNAL_MODEL_TASKS names a task, and serves it only if the evaluation
+    # recorded in labels.json passes the gate below. The int8 file by default:
+    # a quarter of the size and faster on CPU, and the gate requires its own
+    # recorded agreement with the full model before it may serve.
+    internal_model_path: str = "ml/vision/artifacts/skin_disease_model.int8.onnx"
+    internal_model_labels_path: str = "ml/vision/artifacts/labels.json"
+
+    # FR-AI-010 / NFR-SAFE-008 thresholds. The proposed values from
+    # ml/README.md -- agree them with your supervisor before quoting them as
+    # requirements. Every skin-tone group must have enough validation photos to
+    # be measured at all: a group too small to measure fails, rather than being
+    # left out of the fairness check.
+    model_gate_min_macro_f1: float = 0.55
+    model_gate_min_tone_accuracy: float = 0.70
+    model_gate_max_tone_gap: float = 0.15
+    model_gate_min_tone_samples: int = 20
+    model_gate_min_int8_agreement: float = 0.98
+
+    # POST /v1/dev/skin-model/predict: the model's raw output, for testing it
+    # on photos. Off unless set, and never served in production regardless.
+    skin_model_debug_endpoint: bool = False
+
     # --- Quota (FR-SUB-001, FR-SUB-004) ------------------------------------
     quota_enforced: bool = True
     default_scan_allowance: int = 1

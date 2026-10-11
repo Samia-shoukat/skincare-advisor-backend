@@ -125,9 +125,18 @@ def get_scan_pipeline(settings: SettingsDep, store: MatrixStoreDep) -> ScanPipel
     global _pipeline
     if _pipeline is None:
         from app.services.analysis.gemini import GeminiProvider
+        from app.services.analysis.onnx_skin import build_internal_provider
         from app.services.analysis.router import AnalysisRouter
 
-        router = AnalysisRouter(settings, hosted=GeminiProvider(settings))
+        # None unless INTERNAL_MODEL_TASKS names a task and the model loads;
+        # registered but declining every task unless it passes the FR-AI-010
+        # gate. Either way the router falls back to the hosted provider and
+        # records why, so this line cannot make a scan worse than hosted-only.
+        router = AnalysisRouter(
+            settings,
+            hosted=GeminiProvider(settings),
+            internal=build_internal_provider(settings),
+        )
         _pipeline = ScanPipeline(settings, router, routines=RoutineService(store))
     return _pipeline
 

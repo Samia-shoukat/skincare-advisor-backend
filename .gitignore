@@ -5,3 +5,7 @@ __pycache__/
 postman/local.postman_environment.json
 postman/grey-test-image.png
 *.bak 
+# Trained model weights: 87-343 MB, past GitHub's 100 MB file limit. They
+# reach a server by its own copy step, not through git. labels.json and
+# NOTICE.txt beside them are small and are tracked.
+ml/vision/artifacts/*.onnx
