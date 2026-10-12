@@ -40,6 +40,8 @@ from app.schemas.onboarding import (
     ProfileResponse,
     SafetyAnswersRequest,
     SafetyAnswersResponse,
+    SensitivitiesRequest,
+    SensitivitiesResponse,
     SessionResponse,
     SkinTypeRequest,
     SkinTypeResponse,
@@ -60,6 +62,8 @@ def _needs(user: User, required_consent_version: str) -> dict[str, bool]:
         "needs_safety_answers": not user.safety_answers_completed,
         "needs_skin_type": user.skin_type is None,
         "needs_consent": not user.consent_current(required_consent_version),
+        # Optional; not part of onboarding_complete (see the User model).
+        "needs_sensitivities": user.sensitive_skin is None or user.fragrance_allergy is None,
     }
 
 
@@ -352,6 +356,33 @@ async def get_profile(user: CurrentUser) -> ProfileResponse:
         onboarding_complete=user.onboarding_complete,
         scans_remaining=user.scans_remaining,
         consent_version=user.consent_version,
+        sensitive_skin=user.sensitive_skin,
+        fragrance_allergy=user.fragrance_allergy,
+    )
+
+
+@router.post("/me/sensitivities", response_model=SensitivitiesResponse)
+async def set_sensitivities(
+    payload: SensitivitiesRequest,
+    user: CurrentUser,
+    session: SessionDep,
+) -> SensitivitiesResponse:
+    """
+    Sensitive skin and fragrance allergy. Answerable any time, changeable any
+    time, and never a gate: onboarding_complete does not depend on them.
+
+    For product matching only -- they change which product is suggested for a
+    step, not what the rules matrix decided the step is (CON-003).
+    """
+    user.sensitive_skin = payload.sensitive_skin
+    user.fragrance_allergy = payload.fragrance_allergy
+    user.sensitivities_set_at = datetime.now(timezone.utc)
+    await session.flush()
+
+    return SensitivitiesResponse(
+        sensitive_skin=user.sensitive_skin,
+        fragrance_allergy=user.fragrance_allergy,
+        onboarding_complete=user.onboarding_complete,
     )
 
 

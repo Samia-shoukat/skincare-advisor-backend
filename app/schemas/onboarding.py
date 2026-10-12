@@ -53,6 +53,10 @@ class SessionResponse(_Base):
     needs_safety_answers: bool = Field(alias="needsSafetyAnswers")
     needs_skin_type: bool = Field(alias="needsSkinType")
     needs_consent: bool = Field(alias="needsConsent")
+    # Optional, and outside the four above: true until the sensitivity
+    # questions are answered, but never part of onboardingComplete. The client
+    # may ask whenever it likes.
+    needs_sensitivities: bool = Field(alias="needsSensitivities")
 
     # FR-ONB-003. A plain boolean with no explanation attached.
     scan_access_blocked: bool = Field(alias="scanAccessBlocked")
@@ -208,3 +212,28 @@ class ProfileResponse(_Base):
     onboarding_complete: bool = Field(alias="onboardingComplete")
     scans_remaining: int = Field(alias="scansRemaining")
     consent_version: str | None = Field(alias="consentVersion")
+    # Null until answered.
+    sensitive_skin: bool | None = Field(default=None, alias="sensitiveSkin")
+    fragrance_allergy: bool | None = Field(default=None, alias="fragranceAllergy")
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/me/sensitivities
+# ---------------------------------------------------------------------------
+
+
+class SensitivitiesRequest(_Base):
+    """
+    Both answers, every time -- the same rule as the safety answers: a
+    partial submit would leave a profile that looks answered but isn't.
+    """
+
+    sensitive_skin: bool = Field(alias="sensitiveSkin")
+    fragrance_allergy: bool = Field(alias="fragranceAllergy")
+
+
+class SensitivitiesResponse(_Base):
+    sensitive_skin: bool = Field(alias="sensitiveSkin")
+    fragrance_allergy: bool = Field(alias="fragranceAllergy")
+    # Unchanged by this endpoint; returned so the client need not re-fetch.
+    onboarding_complete: bool = Field(alias="onboardingComplete")

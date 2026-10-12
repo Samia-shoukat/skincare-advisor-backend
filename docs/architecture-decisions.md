@@ -348,3 +348,42 @@ disables the model, never the scan endpoint.
 *Cost:* the ONNX files are not in git (87–343 MB). A server that should run
 the model needs its own copy step; none is built, because no model has yet
 earned one.
+
+---
+
+### ADR-029 — Scraped products enter the catalogue by parser proposal and human approval
+**FR-REC-005, DR-005, DR-006, CON-003** · Accepted
+
+Products scraped from Pakistani brand stores (`scraped_products`) can reach
+routines only through the existing catalogue file. Three pieces:
+
+- `app/clinical/ingredients/inci_lexicon.v0.json` -- which printed names map
+  to which matrix ingredient, and which are actives the matrix does not cover.
+  Clinical content, versioned beside the matrix.
+- `app/services/ingredient_parser.py` -- reads a product against the matrix and
+  proposes a catalogue entry, or says why not. `scripts/build_catalogue_
+  candidates.py` runs it over the table.
+- `scripts/review_candidates.py` -- a person approves each proposal. Approval
+  appends to `catalogue.v0.json` (validated by the seed loader first) and is
+  recorded in `review_log.json`; `seed_catalogue.py --apply` publishes it.
+
+Approval writes the file, not the table, because the seed deactivates anything
+missing from the file -- a row written straight to the table would be switched
+off by the next seed.
+
+*The parser answers no whenever it cannot verify:* an active the matrix lacks,
+two actives in one bottle, a printed strength above every rule's maximum, a
+"key ingredients" list instead of a full one, a fragranced or active cleanser,
+a sunscreen below SPF 30. MVP scope (decided 2026-10-12): only products that
+fit the current matrix. Of 104 scraped products, 11 are approvable (5 of them
+once a strength is read off the packaging); the rest are blocked with reasons.
+
+*Also:* users gain optional `sensitiveSkin` / `fragranceAllergy` answers
+(`POST /v1/me/sensitivities`) for the coming product ranker. They are not part
+of `onboarding_complete` -- a refinement of which bottle is suggested must not
+decide whether a scan may run.
+
+*Cost:* until the ranker replaces "first permitted product by id", whether an
+approved product is shown for a step depends on its id's sort order. Images
+are kept in the catalogue file (`imageUrl`) but not yet in the products table
+or the API.

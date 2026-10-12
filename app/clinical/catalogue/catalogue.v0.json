@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0-pk",
+  "version": "1.1.0-pk",
   "_about": [
     "Product catalogue, Pakistan. FR-REC-005, DR-005, DR-006.",
     "",
@@ -302,6 +302,138 @@
           "percent": 12
         }
       ]
+    },
+    {
+      "id": "nirvana-botanic-cloud-oil-free-gel-moisturizer",
+      "brand": "Nirvana Botanic",
+      "name": "Cloud Oil Free Gel Moisturizer",
+      "priceTier": "PREMIUM",
+      "ingredients": [
+        {
+          "ingredient": "niacinamide",
+          "percent": 5.0
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0548/7781/5042/files/CLoud_01.jpg?v=1726491558",
+      "price": "Rs. 1,657",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "93052634-e345-40ba-8bb0-35911abbfbf9",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Active: 5% Niacinamide, 0.5% Witch Hazel - Other ingredients: Aqua, Organic Rosa Damascena Flower Water, Organic Witch Hazel Extract Blend, Lactobacillus Ferment, Propanediol (from Sugar Cane), 5% Niacinamide, Sodium Hyaluronate (Hyaluronic Acid), Isoamyl Laurate, Hordeum Vulgare (Barley) Seed Flour, Sorbitan Olivate, Organic Glycerin (from Flaxseed), Rose Stem Cells",
+      "skinType": "Oily"
+    },
+    {
+      "id": "nirvana-botanic-light-mineral-sunscreen-spf-30",
+      "brand": "Nirvana Botanic",
+      "name": "Light Mineral Sunscreen SPF 30+++",
+      "priceTier": "BUDGET",
+      "ingredients": [
+        {
+          "ingredient": "sunscreen_spf30",
+          "percent": null
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0548/7781/5042/files/Sunscreen-Picture_01.jpg?v=1768301791",
+      "price": "Rs. 999",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "7436ec74-b7be-4eb7-b6e1-8d3155d39baf",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Titanium Dioxide, Zinc Oxide, Aloe Barbadensis Leaf Juice*, Aluminum Hydroxide, Butyrospermum Parkii (Shea Butter)*, Caprylhydroxamic Acid, Caprylic/Capric Triglyceride (Coconut Oil), Carthamus Tinctorius (Safflower) Seed Oil, Glycerin, Glyceryl Caprylate, Glyceryl Stearate Citrate, Helianthus Annuus (Sunflower) Seed Oil*, Lavandula Angustifolia (Lavender) Oil*, Polyhydroxystearic Acid, Sorbitan Oleate, Tocopherol (Vitamin E), Water. *Organic",
+      "skinType": null
+    },
+    {
+      "id": "skin-pantry-barrier-bestie-ceramide-moisturiser-100-ml",
+      "brand": "Skin Pantry",
+      "name": "Barrier Bestie Ceramide Moisturiser (100 ml)",
+      "priceTier": "PREMIUM",
+      "ingredients": [
+        {
+          "ingredient": "moisturiser_barrier",
+          "percent": null
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0761/9238/3154/files/Barrier_Bestie_3cad301b-717a-4cf3-9609-b2dd10377a78.webp?v=1791230054",
+      "price": "Rs. 1,402",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "c338edce-48b8-4061-9d3e-a58a50c34f41",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Ceramide 3, Glycerin and Sodium PCA, Squalene, Shea butter and coconut oil",
+      "skinType": "Dry"
+    },
+    {
+      "id": "trego-rose-face-wash",
+      "brand": "Trego",
+      "name": "ROSE FACE WASH",
+      "priceTier": "BUDGET",
+      "ingredients": [
+        {
+          "ingredient": "gentle_cleanser",
+          "percent": null
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0625/0764/7161/files/6_d18c09bc-2e26-453d-8ac0-4ec496faa132.jpg?v=1701863519",
+      "price": "Rs. 995",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "099b7603-9da9-44c0-ab2d-c933b19983cd",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Aqua, Coco Glucoside, Coco-betaine, Rose Water, Rose Petals, Xanthan Gum, Glycerol and Leucidal SF",
+      "skinType": null
+    },
+    {
+      "id": "trego-saffron-face-wash",
+      "brand": "Trego",
+      "name": "SAFFRON FACE WASH",
+      "priceTier": "BUDGET",
+      "ingredients": [
+        {
+          "ingredient": "gentle_cleanser",
+          "percent": null
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0625/0764/7161/files/546oo.jpg?v=1701863810",
+      "price": "Rs. 995",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "c4d25a87-6ac4-49d9-851a-110ffcba778a",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Aqua, Saffron, Cocamidopropyl, Coco Glucoside, D-Panthenol, Carboxymethylcellulose, Butyl Glycol, Glycerol and Leucidal SF",
+      "skinType": null
+    },
+    {
+      "id": "trego-sunscreen-spf-50",
+      "brand": "Trego",
+      "name": "SUNSCREEN SPF 50++",
+      "priceTier": "PREMIUM",
+      "ingredients": [
+        {
+          "ingredient": "sunscreen_spf30",
+          "percent": null
+        }
+      ],
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0625/0764/7161/files/IMG_7639800x800.jpg?v=1722642658",
+      "price": "Rs. 1,300",
+      "fragrance": false,
+      "source": {
+        "table": "scraped_products",
+        "id": "09a7c34e-6a7f-4e03-876c-c901b4083af8",
+        "parserVersion": "0.1.0"
+      },
+      "inci": "Aqua, Titanium Dioxide, Zinc Oxide, Caprylic/Capric Triglyceride, PEG-10 Dimethicone, Rosemarinus ext, Threonine, Polydimethysiloxyethyl, Cyclopentasiloxane, Glycol, Glycerol, Citric acid, Stearyl Alcohol, Phenoxyethanol, Arginine",
+      "skinType": "All"
     }
   ]
 }

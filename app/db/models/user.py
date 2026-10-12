@@ -100,6 +100,20 @@ class User(Base):
     skin_type: Mapped[SkinType | None] = mapped_column(SAEnum(SkinType, name="skin_type"))
     skin_type_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Sensitivities ------------------------------------------------------
+    # For product matching: a fragrance allergy rules out fragranced products,
+    # sensitive skin weighs against irritants. They change which bottle is
+    # suggested for a step, never the ingredient, timing or strength the rules
+    # matrix chose (CON-003).
+    #
+    # Null until answered, and deliberately NOT part of onboarding_complete:
+    # they refine a suggestion, they do not decide whether a scan may run --
+    # and as a gate they would lock every existing account out of scanning
+    # until the app learned to ask.
+    sensitive_skin: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    fragrance_allergy: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    sensitivities_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # --- Consent (FR-ONB-007) ---------------------------------------------
     # Both fields matter. The version is what makes re-acknowledgement possible
     # when the limitations statement changes.
