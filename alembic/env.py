@@ -49,11 +49,22 @@ config.set_main_option(
 
 target_metadata = Base.metadata
 
+# Tables in the database that Alembic does not own. `scraped_products` is made
+# by hand in the Supabase SQL editor (scripts/scraped_products.sql) and filled by
+# scripts/scrape_products.py. Without this, autogenerate sees a table missing
+# from the models and writes a migration that drops it.
+UNMANAGED_TABLES = {"scraped_products"}
+
+
+def _include_object(obj, name, type_, reflected, compare_to) -> bool:
+    return not (type_ == "table" and name in UNMANAGED_TABLES)
+
 
 def _configure(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
+        include_object=_include_object,
         # Without this, a column changing from String(32) to String(64), or an
         # enum gaining a value, produces an empty migration.
         compare_type=True,
@@ -71,6 +82,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

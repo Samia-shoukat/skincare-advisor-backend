@@ -1,0 +1,6 @@
+# For scripts/scrape_products.py only. Kept out of requirements.txt so the
+# deployed API does not carry scraping dependencies it never uses.
+requests>=2.31
+beautifulsoup4>=4.12
+supabase>=2.0
+python-dotenv>=1.0
