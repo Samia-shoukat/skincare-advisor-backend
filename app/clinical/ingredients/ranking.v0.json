@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "_about": [
+    "Product ranking profile. Read by app/services/product_ranking.py.",
+    "",
+    "Orders the products that app/services/catalogue.py already permitted",
+    "for a step. Nothing here can make a product eligible: the six safety",
+    "conditions and the rules matrix decide that (CON-003). This file only",
+    "decides which permitted product is suggested first.",
+    "",
+    "concernTerms     supportive (non-active) ingredients that suit each",
+    "                 concern the scan found. They become the query the",
+    "                 product's ingredient list is matched against.",
+    "skinTypeTerms    the same, for the user's skin type.",
+    "synonyms         names folded together before matching, so 'sodium",
+    "                 hyaluronate' and 'hyaluronic acid' count as one.",
+    "irritants        weighed against for users who report sensitive skin.",
+    "weights          how much each signal moves the score. Ties fall back",
+    "                 to product id, so equal products keep a stable order."
+  ],
+  "synonyms": {
+    "sodium hyaluronate": "hyaluronic acid",
+    "hydrolyzed hyaluronic acid": "hyaluronic acid",
+    "ceramide np": "ceramide",
+    "ceramide ap": "ceramide",
+    "ceramide eop": "ceramide",
+    "ceramide 3": "ceramide",
+    "aloe barbadensis": "aloe vera",
+    "glycerine": "glycerin",
+    "glycerol": "glycerin",
+    "butyrospermum parkii": "shea butter",
+    "squalene": "squalane",
+    "madecassoside": "centella asiatica",
+    "asiaticoside": "centella asiatica"
+  },
+  "concernTerms": {
+    "DRYNESS": ["ceramide", "squalane", "shea butter", "glycerin", "hyaluronic acid", "panthenol", "cholesterol"],
+    "DEHYDRATION": ["hyaluronic acid", "glycerin", "panthenol", "betaine", "trehalose", "sodium pca"],
+    "MILD_REDNESS": ["centella asiatica", "allantoin", "panthenol", "aloe vera", "bisabolol", "dipotassium glycyrrhizate"],
+    "ACNE": ["zinc pca", "allantoin"],
+    "EXCESS_OIL": ["zinc pca"],
+    "ENLARGED_PORES": ["zinc pca"],
+    "FINE_LINES": ["squalane", "ceramide", "hyaluronic acid", "panthenol"],
+    "POST_ACNE_MARKS": ["allantoin", "panthenol"],
+    "UNEVEN_TONE": ["panthenol", "glycerin"]
+  },
+  "skinTypeTerms": {
+    "DRY": ["ceramide", "squalane", "shea butter", "cholesterol"],
+    "OILY": ["zinc pca"],
+    "COMBINATION": ["hyaluronic acid"],
+    "NORMAL": []
+  },
+  "irritants": [
+    "alcohol denat", "denatured alcohol", "sd alcohol", "menthol", "peppermint", "eucalyptus",
+    "camphor", "essential oil", "citrus", "lemon", "lime", "orange peel", "cinnamon", "clove"
+  ],
+  "weights": {
+    "ingredientMatch": 1.0,
+    "skinTypeMatch": 0.3,
+    "skinTypeMismatch": -0.3,
+    "fragranceSensitive": -0.5,
+    "fragranceUnknownSensitive": -0.1,
+    "irritant": -0.2,
+    "irritantCap": -0.6,
+    "ingredientListOnFile": 0.1
+  }
+}

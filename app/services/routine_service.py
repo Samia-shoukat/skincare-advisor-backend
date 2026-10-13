@@ -33,6 +33,7 @@ from app.engine.rules import RoutineInput, generate_routine
 from app.services.analysis.router import RoutedAnalysis
 from app.services.catalogue import match_products
 from app.services.matrix_loader import MatrixStore
+from app.services.product_ranking import RANKER_VERSION, Preferences
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,24 @@ def routine_input(user: User, analysis: RoutedAnalysis) -> RoutineInput:
     )
 
 
+def preferences_for(user: User, data: RoutineInput) -> Preferences:
+    """
+    What product ranking may know. Deliberately not RoutineInput: these never
+    reach the rules engine, which decides steps on safety alone (CON-003).
+    """
+    return Preferences(
+        skin_type=data.skin_type.value if data.skin_type else None,
+        concerns=frozenset(c.value for c in data.concerns),
+        sensitive_skin=user.sensitive_skin,
+        fragrance_allergy=user.fragrance_allergy,
+    )
+
+
 class RoutineService:
-    def __init__(self, matrix_store: MatrixStore) -> None:
+    def __init__(self, matrix_store: MatrixStore, *, product_ranking: str = "ranked") -> None:
         self._store = matrix_store
+        # "ranked" or "first_by_id" -- see Settings.product_ranking.
+        self._ranking = product_ranking
 
     async def matrix_version(self) -> str:
         return (await self._store.get()).matrix.version
@@ -101,7 +117,12 @@ class RoutineService:
                 violations=violations,
             )
 
-        payload, missing = await match_products(session, matrix, data, routine)
+        payload, missing = await match_products(
+            session, matrix, data, routine, preferences_for(user, data), ranking=self._ranking
+        )
+        # Which ranker picked the products, stored with the routine: a past
+        # routine can be explained only if we know what chose its products.
+        payload["productRanking"] = {"mode": self._ranking, "version": RANKER_VERSION}
 
         product_ids = sorted(
             {
@@ -149,6 +170,7 @@ class RoutineService:
                 "am": built.payload["am"],
                 "pm": built.payload["pm"],
                 "concerns": built.concerns,
+                "productRanking": built.payload.get("productRanking"),
             },
             omitted_steps=built.omitted or None,
             missing_tiers=built.missing_tiers or None,

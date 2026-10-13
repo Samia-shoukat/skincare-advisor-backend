@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, String, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.enums import ProductTier
@@ -54,6 +54,20 @@ class Product(Base):
 
     # DR-005 soft delete. Public, per 6.2.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+    # --- Display and ranking (ADR-030) --------------------------------------
+    # From the catalogue file; null for products added before these existed.
+    # None of them is a safety input: the six conditions in
+    # app/services/catalogue.py decide what may be shown, and these only
+    # decide which permitted product is shown first and what it looks like.
+    image_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    price: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # True / False when the ingredient list was read; null when unknown.
+    fragrance: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # The full printed ingredient list, for the ranker's ingredient matching.
+    inci: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Skin types the store says it is for, e.g. "Oily, Combination" or "All".
+    skin_types: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Which seed file last wrote this row. FR-ONB-008's review record binds to
     # a catalogue version as well as a matrix version.

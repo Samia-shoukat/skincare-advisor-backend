@@ -387,3 +387,54 @@ decide whether a scan may run.
 approved product is shown for a step depends on its id's sort order. Images
 are kept in the catalogue file (`imageUrl`) but not yet in the products table
 or the API.
+
+---
+
+### ADR-030 — Permitted products are ranked, not taken in id order
+**FR-REC-001, FR-REC-005, CON-003** · Accepted
+
+`match_products` used to suggest, per step and tier, the first permitted
+product by id -- an alphabetical accident. `app/services/product_ranking.py`
+now orders the permitted products; `PRODUCT_RANKING=first_by_id` restores the
+old behaviour.
+
+Ranking runs strictly after the six safety conditions and can only reorder or
+remove. Its one filter is a declared fragrance allergy, which removes products
+with fragrance *and* products whose fragrance is unknown -- an allergy is not
+outweighed by a good match, and unknown is not "free". Its score is an
+ingredient match (each label read through the INCI lexicon into terms,
+TF-IDF-weighted across the catalogue, cosine-compared with the supportive
+ingredients that suit the user's concerns and skin type, from
+`app/clinical/ingredients/ranking.v0.json`), plus small named adjustments for
+listed skin type, and for sensitive skin, fragrance and irritants. Ties break by
+id, so routines stay deterministic. The ranker version is stored on each routine.
+
+`products` gains `image_url`, `price`, `fragrance`, `inci`, `skin_types`
+(migration e5b1f7c3a9d2), filled from the catalogue file by the seed. Each
+product option in a routine now carries `imageUrl`. The Zero-Save column guards
+allow `products.image_url` by name, and only as a short URL column: it is the
+brand's public product photo, never user data.
+
+*Cost:* the curated products have no ingredient list or fragrance on file, so
+they rank on id among themselves, and an allergic user is shown none of them
+until their fragrance is recorded.
+
+---
+
+### ADR-031 — The hosted provider falls back to a second Gemini model
+**DEP-001, FR-AI-004** · Accepted
+
+From 2026-10-10 Google answered `gemini-3.8-flash` with 503 "high demand" to
+nearly every request; 15 scans failed against 2 that succeeded. The provider
+now tries `GEMINI_FALLBACK_MODELS` (default `gemini-3.1-flash-lite`) when the
+main model is overloaded (503/429), retired (404) or silent -- at once, without
+retrying a model that is refusing. Only the last model gets the short retries.
+The whole call has a 27-second budget so the client's 30-second timeout never
+fires first, and every fallback is logged at warning.
+
+The fallback passed the Appendix G prompts and schema validation, live, on a
+test image and a face photograph before it was configured.
+
+*Cost:* a scan served by the fallback was analysed by a different, smaller
+model. It is logged, not yet recorded on the scan log; if fallbacks persist,
+change `GEMINI_MODEL` rather than living on the fallback.

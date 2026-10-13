@@ -649,12 +649,19 @@ def test_no_table_has_an_image_shaped_column():
 
     from app.db.base import Base
 
+    from tests.test_zero_save import ALLOWED_IMAGE_NAMED, assert_allowed_is_a_short_url
+
     image_words = {"image", "photo", "picture", "payload", "img", "selfie", "frame"}
     offenders = []
 
     for table in Base.metadata.tables.values():
         for column in table.columns:
             if any(word in column.name.lower() for word in image_words):
+                # A public product-photo URL, not user data. See the note on
+                # ALLOWED_IMAGE_NAMED in tests/test_zero_save.py.
+                if f"{table.name}.{column.name}" in ALLOWED_IMAGE_NAMED:
+                    assert_allowed_is_a_short_url(table, column)
+                    continue
                 offenders.append(f"{table.name}.{column.name}")
             if isinstance(column.type, LargeBinary):
                 offenders.append(f"{table.name}.{column.name} (binary)")

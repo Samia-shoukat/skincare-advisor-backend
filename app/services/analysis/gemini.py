@@ -50,6 +50,14 @@ _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gen
 _TRANSIENT = frozenset({429, 500, 503})
 _RETRY_DELAYS: tuple[float, ...] = (1.0, 2.0)
 
+# The whole call -- main model, fallbacks and retries -- finishes inside this,
+# so the client's 30-second upload timeout never fires first: a user should
+# see "try again", not a hung spinner.
+_BUDGET_SECONDS = 27.0
+# The main model's share when a fallback is configured. An overloaded model
+# can hang for 40s before answering; capping it leaves the fallback time.
+_PRIMARY_TIMEOUT = 15.0
+
 
 # The response contract, restated to the provider. The Pydantic schema is the
 # authority; this is the instruction that tries to make the model match it.
@@ -184,6 +192,10 @@ class GeminiProvider(AnalysisProvider):
         self._settings = settings
         self._client = client or httpx.AsyncClient(timeout=25.0)
         self._model = settings.gemini_model
+        self._fallbacks = [
+            m.strip() for m in settings.gemini_fallback_models.split(",")
+            if m.strip() and m.strip() != settings.gemini_model
+        ]
 
     def supports(self, task: AnalysisTask) -> bool:
         """
@@ -223,43 +235,13 @@ class GeminiProvider(AnalysisProvider):
             },
         }
 
-        # Google answers 503 (overloaded) or 429 (rate limited) under load, and
-        # the same request usually succeeds a second later. Retried briefly so
-        # a user is not failed for a momentary blip; anything else -- a 400, a
-        # 404 for a retired model -- fails at once, because retrying cannot fix
-        # it. Worst case adds ~3s against the 30s client timeout.
-        response = None
-        for attempt, delay in enumerate(_RETRY_DELAYS + (None,)):
-            try:
-                response = await self._client.post(
-                    _ENDPOINT.format(model=self._model),
-                    headers={"x-goog-api-key": self._settings.gemini_api_key},
-                    json=body,
-                )
-                if response.status_code in _TRANSIENT and delay is not None:
-                    logger.info(
-                        "vision provider returned %d, retrying (attempt %d)",
-                        response.status_code,
-                        attempt + 1,
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                response.raise_for_status()
-                break
-            except httpx.HTTPStatusError as exc:
-                # Logged without the request body: that body holds the base64
-                # image, and a stack trace carrying a face photograph into a
-                # log file is exactly what FR-CAM-004 exists to prevent.
-                logger.warning(
-                    "vision provider call failed: HTTP %d", exc.response.status_code
-                )
-                raise ProviderUnavailable(f"HTTP {exc.response.status_code}") from None
-            except httpx.HTTPError as exc:
-                if delay is not None:
-                    await asyncio.sleep(delay)
-                    continue
-                logger.warning("vision provider call failed: %s", type(exc).__name__)
-                raise ProviderUnavailable(type(exc).__name__) from None
+        response, served_by = await self._post(body)
+        if served_by != self._model:
+            # The main model was overloaded, retired or silent. Worth seeing in
+            # the logs: a fallback serving for days means the main model
+            # setting should change.
+            logger.warning("vision provider: %s unavailable, served by fallback %s",
+                           self._model, served_by)
 
         raw = self._extract_json(response.json())
         parsed, discards = parse_provider_response(raw)
@@ -271,6 +253,66 @@ class GeminiProvider(AnalysisProvider):
         return ProviderResult(
             response=parsed, discards=discards, backend=self.backend, task=task
         )
+
+    def _attempts(self) -> list[tuple[str, float]]:
+        """
+        (model, wait before trying) in order.
+
+        With fallbacks configured, an overloaded main model is not retried: a
+        503 that has lasted three days (October 2026) does not clear in the
+        second a retry waits, and the user's time is better spent on a model
+        that is answering. Only the last model gets the short retries. Without
+        fallbacks, the main model is retried as before.
+        """
+        models = [self._model, *self._fallbacks]
+        attempts = [(m, 0.0) for m in models]
+        attempts += [(models[-1], delay) for delay in _RETRY_DELAYS]
+        return attempts
+
+    async def _post(self, body: dict[str, Any]) -> tuple[httpx.Response, str]:
+        """
+        Try each model until one answers. Returns the response and the model.
+
+        Google answers 503 (overloaded) or 429 (rate limited) under load, and
+        a retired model answers 404. Any of those moves on to the next model; a
+        400 -- a malformed request -- fails at once, because every model would
+        refuse it. Everything happens inside _BUDGET_SECONDS.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _BUDGET_SECONDS
+        failures: list[str] = []
+        retired: set[str] = set()       # answered 404: retrying cannot help
+        for model, delay in self._attempts():
+            if model in retired:
+                continue
+            if delay:
+                await asyncio.sleep(delay)
+            remaining = deadline - loop.time()
+            if remaining < 2.0:
+                break
+            timeout = min(remaining, _PRIMARY_TIMEOUT) if model == self._model and self._fallbacks else remaining
+            try:
+                response = await self._client.post(
+                    _ENDPOINT.format(model=model),
+                    headers={"x-goog-api-key": self._settings.gemini_api_key},
+                    json=body,
+                    timeout=timeout,
+                )
+            except httpx.HTTPError as exc:
+                # Logged by type only: the request body holds the base64 image,
+                # and a face photograph in a log is what FR-CAM-004 forbids.
+                failures.append(f"{model}: {type(exc).__name__}")
+                continue
+            if response.status_code < 400:
+                return response, model
+            failures.append(f"{model}: HTTP {response.status_code}")
+            if response.status_code == 404:
+                retired.add(model)
+            elif response.status_code not in _TRANSIENT:
+                break
+
+        logger.warning("vision provider call failed: %s", "; ".join(failures))
+        raise ProviderUnavailable("; ".join(failures) or "no attempt made")
 
     @staticmethod
     def _extract_json(payload: dict[str, Any]) -> dict[str, Any]:

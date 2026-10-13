@@ -48,6 +48,7 @@ from app.core.enums import ProductTier
 from app.db.models.catalogue import Product
 from app.engine.rules import Routine, RoutineInput, RoutineStep, excluded_ingredients
 from app.services.matrix_loader import Matrix
+from app.services.product_ranking import Preferences, ProductRanker, preference_permitted
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,12 @@ class CatalogueEntry:
     name: str
     price_tier: ProductTier
     ingredients: list[dict[str, Any]]
+    # Display and ranking (ADR-030). Optional: the curated products predate them.
+    image_url: str | None = None
+    price: str | None = None
+    fragrance: bool | None = None
+    inci: str | None = None
+    skin_types: str | None = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +123,15 @@ def load_catalogue_file(path: Path, matrix: Matrix) -> CatalogueFile:
                 raise CatalogueInvalid(f"{product_id}: percent must be a positive number or null")
             cleaned.append({"ingredient": key, "percent": percent})
 
+        # The app loads this URL directly, so only an encrypted address is
+        # accepted -- a plain http:// image would be fetched in the clear.
+        image_url = raw.get("imageUrl")
+        if image_url is not None and (not isinstance(image_url, str) or not image_url.startswith("https://")):
+            raise CatalogueInvalid(f"{product_id}: imageUrl must be an https:// address or null")
+        fragrance = raw.get("fragrance")
+        if fragrance is not None and not isinstance(fragrance, bool):
+            raise CatalogueInvalid(f"{product_id}: fragrance must be true, false or null")
+
         entries.append(
             CatalogueEntry(
                 id=product_id,
@@ -123,6 +139,11 @@ def load_catalogue_file(path: Path, matrix: Matrix) -> CatalogueFile:
                 name=str(raw.get("name") or "").strip(),
                 price_tier=tier,
                 ingredients=cleaned,
+                image_url=image_url,
+                price=_text_or_none(raw.get("price"), 64),
+                fragrance=fragrance,
+                inci=_text_or_none(raw.get("inci")),
+                skin_types=_text_or_none(raw.get("skinType"), 200),
             )
         )
 
@@ -130,6 +151,13 @@ def load_catalogue_file(path: Path, matrix: Matrix) -> CatalogueFile:
         raise CatalogueInvalid("catalogue has no products")
 
     return CatalogueFile(version=version, entries=tuple(entries))
+
+
+def _text_or_none(value: Any, limit: int | None = None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return (text[:limit] if limit else text) or None
 
 
 async def sync_catalogue(session: AsyncSession, catalogue: CatalogueFile) -> dict[str, int]:
@@ -155,6 +183,11 @@ async def sync_catalogue(session: AsyncSession, catalogue: CatalogueFile) -> dic
         product.name = entry.name
         product.price_tier = entry.price_tier
         product.ingredients = entry.ingredients
+        product.image_url = entry.image_url
+        product.price = entry.price
+        product.fragrance = entry.fragrance
+        product.inci = entry.inci
+        product.skin_types = entry.skin_types
         product.is_active = True
         product.catalogue_version = catalogue.version
 
@@ -222,18 +255,31 @@ def product_permitted(
 def _product_payload(product: Product | None) -> dict[str, Any] | None:
     if product is None:
         return None
-    return {"id": product.id, "brand": product.brand, "name": product.name}
+    # imageUrl is null for products without one; the client shows a
+    # placeholder. Stored with the routine, so a routine keeps the picture it
+    # was shown with even if the catalogue later changes.
+    return {"id": product.id, "brand": product.brand, "name": product.name,
+            "imageUrl": product.image_url}
 
 
 async def match_products(
-    session: AsyncSession, matrix: Matrix, data: RoutineInput, routine: Routine
+    session: AsyncSession,
+    matrix: Matrix,
+    data: RoutineInput,
+    routine: Routine,
+    preferences: Preferences | None = None,
+    *,
+    ranking: str = "ranked",
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """
     Product options for every step, and the tiers that could not be filled.
 
-    Returns (routine payload with products attached, missing tiers). Ordering
-    within a tier is by product id, so the same catalogue always yields the
-    same pick -- FR-REC-001's determinism extends to what the user is shown.
+    Returns (routine payload with products attached, missing tiers). The six
+    conditions above decide what MAY be shown; then a declared fragrance
+    allergy removes more; then, with `ranking="ranked"` and preferences
+    given, app/services/product_ranking.py orders what is left. Otherwise --
+    and for ties -- the order is product id, so the same catalogue and user
+    always yield the same pick (FR-REC-001).
     """
     products = list(
         (
@@ -245,19 +291,21 @@ async def match_products(
     excluded = set(excluded_ingredients(matrix, data))
     routine_ingredients = routine.ingredients()
     missing: list[dict[str, str]] = []
+    ranker = ProductRanker(products) if ranking == "ranked" and preferences is not None else None
 
     def options_for(step: RoutineStep, timing: str) -> dict[str, Any]:
         picks: dict[ProductTier, Product | None] = {}
         for tier in (ProductTier.BUDGET, ProductTier.PREMIUM):
-            picks[tier] = next(
-                (
-                    p
-                    for p in products
-                    if p.price_tier is tier
-                    and product_permitted(p, step, matrix, excluded, routine_ingredients)
-                ),
-                None,
-            )
+            permitted = [
+                p
+                for p in products
+                if p.price_tier is tier
+                and product_permitted(p, step, matrix, excluded, routine_ingredients)
+                and preference_permitted(p, preferences)
+            ]
+            if ranker is not None:
+                permitted = ranker.rank(permitted, preferences)
+            picks[tier] = permitted[0] if permitted else None
             if picks[tier] is None:
                 missing.append(
                     {"timing": timing, "step": step.step, "ingredient": step.ingredient, "tier": tier.value}

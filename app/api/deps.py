@@ -137,7 +137,10 @@ def get_scan_pipeline(settings: SettingsDep, store: MatrixStoreDep) -> ScanPipel
             hosted=GeminiProvider(settings),
             internal=build_internal_provider(settings),
         )
-        _pipeline = ScanPipeline(settings, router, routines=RoutineService(store))
+        _pipeline = ScanPipeline(
+            settings, router,
+            routines=RoutineService(store, product_ranking=settings.product_ranking),
+        )
     return _pipeline
 
 

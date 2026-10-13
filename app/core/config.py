@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     # too. Google retires old models (gemini-2.0-flash now returns 404, which
     # failed every scan), so check the model list when a scan starts failing.
     gemini_model: str = "gemini-3.8-flash"
+    # Tried in order when the main model is overloaded (503/429), retired
+    # (404) or silent. Pinned names, not aliases, for the same reason as above.
+    # Added 2026-10-13: gemini-3.8-flash answered 503 "high demand" to every
+    # request for three days, and every scan failed. gemini-3.1-flash-lite
+    # passed the Appendix G prompts and validation in testing.
+    gemini_fallback_models: str = "gemini-3.1-flash-lite"
 
     # FR-CAM-004 states the Zero-Save Policy is NOT satisfied if the provider
     # retains inputs. This is asserted at startup rather than assumed, so
@@ -110,6 +116,12 @@ class Settings(BaseSettings):
     model_gate_max_tone_gap: float = 0.15
     model_gate_min_tone_samples: int = 20
     model_gate_min_int8_agreement: float = 0.98
+
+    # How a step's product is chosen among those the safety filter permits.
+    # "ranked": app/services/product_ranking.py (ingredient match, skin type,
+    # sensitivities; ADR-030). "first_by_id": the original alphabetical pick,
+    # kept as the way back. Either way a declared fragrance allergy filters.
+    product_ranking: str = "ranked"
 
     # POST /v1/dev/skin-model/predict: the model's raw output, for testing it
     # on photos. Off unless set, and never served in production regardless.

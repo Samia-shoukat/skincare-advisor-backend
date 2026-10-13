@@ -34,15 +34,32 @@ def test_no_table_has_a_binary_column():
     assert offenders == []
 
 
+# Named exceptions, each a short text column that cannot hold image bytes.
+# products.image_url is the address of the brand's PUBLIC product photo on its
+# own store (ADR-030): catalogue data, never a user's photograph. Adding to
+# this list needs the same justification, not a quieter name.
+ALLOWED_IMAGE_NAMED = {"products.image_url"}
+
+
+def assert_allowed_is_a_short_url(table, column) -> None:
+    from sqlalchemy import String
+
+    assert isinstance(column.type, String) and column.type.length and column.type.length <= 1000, (
+        f"{table.name}.{column.name} is allowed only as a short URL column")
+
+
 def test_no_column_is_named_for_an_image():
     """SRS 6.2: `imagePayload` must not exist as a persisted column."""
     suspicious = ("image", "photo", "payload", "picture", "selfie")
-    offenders = [
-        f"{table.name}.{column.name}"
-        for table in Base.metadata.tables.values()
-        for column in table.columns
-        if any(word in column.name.lower() for word in suspicious)
-    ]
+    offenders = []
+    for table in Base.metadata.tables.values():
+        for column in table.columns:
+            if not any(word in column.name.lower() for word in suspicious):
+                continue
+            if f"{table.name}.{column.name}" in ALLOWED_IMAGE_NAMED:
+                assert_allowed_is_a_short_url(table, column)
+                continue
+            offenders.append(f"{table.name}.{column.name}")
     assert offenders == []
 
 
